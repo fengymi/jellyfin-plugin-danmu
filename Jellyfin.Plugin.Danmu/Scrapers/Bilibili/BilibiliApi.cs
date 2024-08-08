@@ -313,6 +313,7 @@ public class BilibiliApi : AbstractApi
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = cid;
         danmaku.ChatServer = "api.bilibili.com";
+        danmaku.ProviderId = Bilibili.ScraperProviderId;
         danmaku.Items = new List<ScraperDanmakuText>();
 
         await this.EnsureSessionCookie(cancellationToken).ConfigureAwait(false);

@@ -10,10 +10,14 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Dto;
 using System.Collections.Generic;
+using System.Linq;
 using Jellyfin.Plugin.Danmu.Scrapers;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using System.Text.RegularExpressions;
+using System.Xml;
+using Jellyfin.Plugin.Danmu.Model;
+using MediaBrowser.Controller.Entities;
 
 namespace Jellyfin.Plugin.Danmu.Controllers
 {
@@ -106,6 +110,137 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             }
 
             return File(System.IO.File.ReadAllBytes(danmuPath), "text/xml");
+        }
+
+        /// <summary>
+        /// 获取弹幕文件内容.
+        /// </summary>
+        /// <returns>xml弹幕文件内容</returns>
+        [Route("/api/danmu/supportsites")]
+        [HttpGet]
+        public Task<DanmuResultDto> GetAllSupportSite()
+        {
+            DanmuResultDto result = new DanmuResultDto();
+            var allWithNoEnabled = this._scraperManager.AllWithNoEnabled();
+            List<DanmuSourceDto> sources = new List<DanmuSourceDto>(allWithNoEnabled.Count);
+            foreach (AbstractScraper scraper in allWithNoEnabled)
+            {
+                DanmuSourceDto source = new DanmuSourceDto
+                {
+                    Source = scraper.ProviderId,
+                    SourceName = scraper.ProviderName,
+                    Opened = scraper.DefaultEnable,
+                };
+                sources.Add(source);
+            }
+
+            result.Data = sources;
+            return Task.FromResult(result);
+        }
+
+        /// <summary>
+        /// 获取弹幕文件内容.
+        /// </summary>
+        /// <returns>xml弹幕文件内容</returns>
+        [Route("/plugin/danmu/json/{id}")]
+        [Route("/api/danmu/{id}/json")]
+        [HttpGet]
+        [HttpPost]
+        public async Task<DanmuResultDto> GetByJson(string id, List<string>? sites)
+        {
+            ArgumentNullException.ThrowIfNull(id);
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new ResourceNotFoundException();
+            }
+
+            var currentItem = this._libraryManager.GetItemById(id);
+            if (currentItem == null)
+            {
+                throw new ResourceNotFoundException();
+            }
+
+            DanmuResultDto danmuResultDto = new DanmuResultDto();
+            if (sites == null || sites.Count == 0)
+            {
+                var count = this._scraperManager.All().Count;
+                if (count == 0)
+                {
+                    return danmuResultDto;
+                }
+
+                sites = this._scraperManager
+                    .All()
+                    .Select(s => s.ProviderId)
+                    .ToList();
+            }
+
+            List<DanmuSourceDto> danmuSources = new List<DanmuSourceDto>(sites.Count);
+            List<Task<DanmuSourceDto?>> danmuSourceTasks = new List<Task<DanmuSourceDto?>>(sites.Count);
+            danmuResultDto.Data = danmuSources;
+
+            foreach (string? site in sites)
+            {
+                Task<DanmuSourceDto?> danmuSourceTask = this.GetDanmuSourceDto(currentItem, site);
+                danmuSourceTasks.Add(danmuSourceTask);
+            }
+
+            danmuSourceTasks.Add(this.GetDanmuSourceDto(currentItem, null));
+
+            await Task.WhenAll(danmuSourceTasks).ConfigureAwait(false);
+            foreach (Task<DanmuSourceDto?> danmuSourceTask in danmuSourceTasks)
+            {
+                var danmuSourceDto = danmuSourceTask.GetAwaiter().GetResult();
+                if (danmuSourceDto != null && sites.Contains(danmuSourceDto.Source))
+                {
+                    danmuSources.Add(danmuSourceDto);
+                }
+            }
+
+            return danmuResultDto;
+             // var danmuPath = Path.Combine(currentItem.ContainingFolderPath, currentItem.FileNameWithoutExtension + ".xml");
+            // var fileMeta = _fileSystem.GetFileInfo(danmuPath);
+            // if (!fileMeta.Exists)
+            // {
+            //     throw new ResourceNotFoundException();
+            // }
+            //
+            // var xmlDocument = new XmlDocument();
+            // xmlDocument.Load(danmuPath);
+            // XmlElement xmlNode = xmlDocument.DocumentElement;
+            // if (xmlNode == null)
+            // {
+            //     return Task.FromResult<>(null);
+            // }
+            // DanmuSourceDto danmuSourceDto = new DanmuSourceDto();
+            // List<DanmuEventDTO> danmuEventDtos = new List<DanmuEventDTO>();
+            // foreach (XmlNode node in xmlNode.ChildNodes) //4.遍历根节点（根节点包含所有节点）
+            // {
+            //     // _logger.Info("XmlNode.InnerText={0}", node.InnerText);
+            //     if ("sourceprovider".Equals(node.Name))
+            //     {
+            //         danmuSourceDto.Source = node.InnerText;
+            //     }
+            //     else if ("datasize".Equals(node.Name) && danmuEventDtos.Count == 0)
+            //     {
+            //         danmuEventDtos = new List<DanmuEventDTO>(int.Parse(node.InnerText));
+            //     }
+            //     else if ("d".Equals(node.Name) && node is XmlElement)
+            //     {
+            //         DanmuEventDTO danmuEvent = new DanmuEventDTO();
+            //         danmuEvent.M = node.InnerText;
+            //         danmuEvent.P = ((XmlElement)node).GetAttribute("p");
+            //         danmuEventDtos.Add(danmuEvent);
+            //     }
+            // }
+            //
+            // if (danmuSourceDto.Source == null)
+            // {
+            //     return Task.FromResult<DanmuSourceDto>(null);
+            // }
+            //
+            // danmuSourceDto.DanmuEvents = danmuEventDtos;
+            // return Task.FromResult(danmuSourceDto);
         }
 
         /// <summary>
@@ -349,6 +484,56 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             }
 
             return "ok";
+        }
+        
+        private Task<DanmuSourceDto?> GetDanmuSourceDto(BaseItem currentItem, string? site)
+        {
+            var danmuPath = Path.Combine(
+                currentItem.ContainingFolderPath,
+                currentItem.FileNameWithoutExtension + (site != null ? "_" + site : string.Empty) + ".xml");
+            var fileMeta = this._fileSystem.GetFileInfo(danmuPath);
+            if (!fileMeta.Exists)
+            {
+                return Task.FromResult<DanmuSourceDto>(null);
+            }
+
+            var xmlDocument = new XmlDocument();
+            xmlDocument.Load(danmuPath);
+            XmlElement? xmlNode = xmlDocument.DocumentElement;
+            if (xmlNode == null)
+            {
+                return Task.FromResult<DanmuSourceDto>(null);
+            }
+
+            DanmuSourceDto? danmuSourceDto = new DanmuSourceDto();
+            List<DanmuEventDTO> danmuEventDtos = new List<DanmuEventDTO>();
+            foreach (XmlNode node in xmlNode.ChildNodes) //4.遍历根节点（根节点包含所有节点）
+            {
+                // _logger.Info("XmlNode.InnerText={0}", node.InnerText);
+                if ("sourceprovider".Equals(node.Name))
+                {
+                    danmuSourceDto.Source = node.InnerText;
+                }
+                else if ("datasize".Equals(node.Name) && danmuEventDtos.Count == 0)
+                {
+                    danmuEventDtos = new List<DanmuEventDTO>(int.Parse(node.InnerText));
+                }
+                else if ("d".Equals(node.Name) && node is XmlElement)
+                {
+                    DanmuEventDTO danmuEvent = new DanmuEventDTO();
+                    danmuEvent.M = node.InnerText;
+                    danmuEvent.P = ((XmlElement)node).GetAttribute("p");
+                    danmuEventDtos.Add(danmuEvent);
+                }
+            }
+
+            if (danmuSourceDto.Source == null)
+            {
+                return Task.FromResult<DanmuSourceDto>(null);
+            }
+
+            danmuSourceDto.DanmuEvents = danmuEventDtos;
+            return Task.FromResult(danmuSourceDto);
         }
     }
 }

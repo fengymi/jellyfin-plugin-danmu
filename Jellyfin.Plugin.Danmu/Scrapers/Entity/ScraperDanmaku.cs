@@ -17,6 +17,11 @@ public class ScraperDanmaku
     public long ChatId { get; set; } = 0;
     [XmlElement("chatserver")]
     public string ChatServer { get; set; } = "chat.bilibili.com";
+    
+    [XmlElement("sourceprovider")] public string ProviderId { get; set; } = Bilibili.Bilibili.ScraperProviderId;
+
+    [XmlElement("datasize")]
+    public int DataSize => this.Items.Count;
 
     [XmlElement("mission")]
     public long Mission { get; set; } = 0;

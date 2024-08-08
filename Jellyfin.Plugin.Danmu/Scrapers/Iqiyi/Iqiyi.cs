@@ -170,6 +170,7 @@ public class Iqiyi : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = commentId.ToLong();
         danmaku.ChatServer = "cmts.iqiyi.com";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
             try

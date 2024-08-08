@@ -201,6 +201,7 @@ public class Mgtv : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = vid.ToLong();
         danmaku.ChatServer = "galaxy.bz.mgtv.com";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
 

@@ -183,6 +183,7 @@ public class Tencent : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = 1000;
         danmaku.ChatServer = "dm.video.qq.com";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
             try

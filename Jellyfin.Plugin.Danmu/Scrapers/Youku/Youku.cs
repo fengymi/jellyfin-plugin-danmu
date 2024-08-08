@@ -182,6 +182,7 @@ public class Youku : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = 1000;
         danmaku.ChatServer = "acs.youku.com";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
             try

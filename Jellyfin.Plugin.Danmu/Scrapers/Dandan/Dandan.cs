@@ -186,6 +186,7 @@ public class Dandan : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = cid;
         danmaku.ChatServer = "api.dandanplay.net";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
             var danmakuText = new ScraperDanmakuText();
