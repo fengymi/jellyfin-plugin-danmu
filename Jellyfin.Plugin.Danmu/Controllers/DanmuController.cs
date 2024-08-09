@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using System.Text.RegularExpressions;
 using System.Xml;
-using Jellyfin.Plugin.Danmu.Model;
+using Jellyfin.Plugin.Danmu.Model.Self;
 using MediaBrowser.Controller.Entities;
 
 namespace Jellyfin.Plugin.Danmu.Controllers
@@ -146,8 +146,9 @@ namespace Jellyfin.Plugin.Danmu.Controllers
         [Route("/api/danmu/{id}/json")]
         [HttpGet]
         [HttpPost]
-        public async Task<DanmuResultDto> GetByJson(string id, List<string>? sites)
+        public async Task<DanmuResultDto> GetByJson(string id, DanmuParams danmuParams)
         {
+            _logger.LogInformation("请求参数 id={0}, site={1}", id, danmuParams.NeedSites);
             ArgumentNullException.ThrowIfNull(id);
             if (string.IsNullOrEmpty(id))
             {
@@ -161,7 +162,8 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             }
 
             DanmuResultDto danmuResultDto = new DanmuResultDto();
-            if (sites == null || sites.Count == 0)
+            List<string> sites;
+            if (danmuParams == null || danmuParams.NeedSites == null || danmuParams.NeedSites.Count == 0)
             {
                 var count = this._scraperManager.All().Count;
                 if (count == 0)
@@ -173,6 +175,10 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                     .All()
                     .Select(s => s.ProviderId)
                     .ToList();
+            }
+            else
+            {
+                sites = danmuParams.NeedSites;
             }
 
             List<DanmuSourceDto> danmuSources = new List<DanmuSourceDto>(sites.Count);
@@ -198,49 +204,6 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             }
 
             return danmuResultDto;
-             // var danmuPath = Path.Combine(currentItem.ContainingFolderPath, currentItem.FileNameWithoutExtension + ".xml");
-            // var fileMeta = _fileSystem.GetFileInfo(danmuPath);
-            // if (!fileMeta.Exists)
-            // {
-            //     throw new ResourceNotFoundException();
-            // }
-            //
-            // var xmlDocument = new XmlDocument();
-            // xmlDocument.Load(danmuPath);
-            // XmlElement xmlNode = xmlDocument.DocumentElement;
-            // if (xmlNode == null)
-            // {
-            //     return Task.FromResult<>(null);
-            // }
-            // DanmuSourceDto danmuSourceDto = new DanmuSourceDto();
-            // List<DanmuEventDTO> danmuEventDtos = new List<DanmuEventDTO>();
-            // foreach (XmlNode node in xmlNode.ChildNodes) //4.遍历根节点（根节点包含所有节点）
-            // {
-            //     // _logger.Info("XmlNode.InnerText={0}", node.InnerText);
-            //     if ("sourceprovider".Equals(node.Name))
-            //     {
-            //         danmuSourceDto.Source = node.InnerText;
-            //     }
-            //     else if ("datasize".Equals(node.Name) && danmuEventDtos.Count == 0)
-            //     {
-            //         danmuEventDtos = new List<DanmuEventDTO>(int.Parse(node.InnerText));
-            //     }
-            //     else if ("d".Equals(node.Name) && node is XmlElement)
-            //     {
-            //         DanmuEventDTO danmuEvent = new DanmuEventDTO();
-            //         danmuEvent.M = node.InnerText;
-            //         danmuEvent.P = ((XmlElement)node).GetAttribute("p");
-            //         danmuEventDtos.Add(danmuEvent);
-            //     }
-            // }
-            //
-            // if (danmuSourceDto.Source == null)
-            // {
-            //     return Task.FromResult<DanmuSourceDto>(null);
-            // }
-            //
-            // danmuSourceDto.DanmuEvents = danmuEventDtos;
-            // return Task.FromResult(danmuSourceDto);
         }
 
         /// <summary>
@@ -488,6 +451,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
         
         private Task<DanmuSourceDto?> GetDanmuSourceDto(BaseItem currentItem, string? site)
         {
+            // return Task.FromResult<DanmuSourceDto>(null);
             var danmuPath = Path.Combine(
                 currentItem.ContainingFolderPath,
                 currentItem.FileNameWithoutExtension + (site != null ? "_" + site : string.Empty) + ".xml");
@@ -496,7 +460,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             {
                 return Task.FromResult<DanmuSourceDto>(null);
             }
-
+            
             var xmlDocument = new XmlDocument();
             xmlDocument.Load(danmuPath);
             XmlElement? xmlNode = xmlDocument.DocumentElement;
@@ -504,7 +468,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             {
                 return Task.FromResult<DanmuSourceDto>(null);
             }
-
+            
             DanmuSourceDto? danmuSourceDto = new DanmuSourceDto();
             List<DanmuEventDTO> danmuEventDtos = new List<DanmuEventDTO>();
             foreach (XmlNode node in xmlNode.ChildNodes) //4.遍历根节点（根节点包含所有节点）
@@ -526,12 +490,12 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                     danmuEventDtos.Add(danmuEvent);
                 }
             }
-
+            
             if (danmuSourceDto.Source == null)
             {
                 return Task.FromResult<DanmuSourceDto>(null);
             }
-
+            
             danmuSourceDto.DanmuEvents = danmuEventDtos;
             return Task.FromResult(danmuSourceDto);
         }

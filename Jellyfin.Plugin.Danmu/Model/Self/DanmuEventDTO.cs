@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Jellyfin.Plugin.Danmu.Model;
+namespace Jellyfin.Plugin.Danmu.Model.Self;
 
 public class DanmuEventDTO
 {

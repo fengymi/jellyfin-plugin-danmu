@@ -21,8 +21,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Controller" Version="10.9.*" />
-    <PackageReference Include="Jellyfin.Model" Version="10.9.*" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.9.0" />
+    <PackageReference Include="Jellyfin.Model" Version="10.9.0" />
+    
     <PackageReference Include="RateLimiter" Version="2.2.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
   </ItemGroup>
@@ -42,10 +43,10 @@
 <!--    <Exec Command="killall 'Jellyfin Server'" ContinueOnError="true"/>-->
 <!--    <Exec Command="open -a jellyfin"/>-->
     <!--
-    mkdir -p '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' && \
-      cp -f /Users/fengymi/RiderProjects/danmu/jellyfin-plugin-danmu/Jellyfin.Plugin.Danmu/bin/Release/net8.0/Jellyfin.Plugin.Danmu.dll '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' &&\
-      killall 'Jellyfin Server' &&\
-      killall jellyfin\
+    mkdir -p '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' &&\ 
+     cp -f /Users/fengymi/RiderProjects/danmu/jellyfin-plugin-danmu/Jellyfin.Plugin.Danmu/bin/Release/net8.0/Jellyfin.Plugin.Danmu.dll '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' &&\ 
+     killall 'Jellyfin Server' &&\
+      killall jellyfin &&\
       open -a jellyfin
     -->  
   </Target>
