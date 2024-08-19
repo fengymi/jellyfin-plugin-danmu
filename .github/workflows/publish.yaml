@@ -3,7 +3,7 @@ name: "🚀 Publish Plugin"
 on:
   workflow_dispatch:
   push:
-    branches: ["jellyfin/main"]
+#    branches: ["jellyfin/main"]
     tags: ["*"]
 
 env:
