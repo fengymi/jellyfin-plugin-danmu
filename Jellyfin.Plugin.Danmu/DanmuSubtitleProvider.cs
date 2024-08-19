@@ -9,7 +9,6 @@ using Jellyfin.Plugin.Danmu.Model;
 using Jellyfin.Plugin.Danmu.Scrapers;
 using Jellyfin.Plugin.Danmu.Scrapers.Entity;
 using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
@@ -43,6 +42,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
     {
         var base64EncodedBytes = System.Convert.FromBase64String(id);
         id = System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
+        _logger.LogInformation("手动查询弹幕信息 info={id}", id);
         var info = id.FromJson<SubtitleId>();
         if (info == null)
         {
@@ -170,10 +170,15 @@ public class DanmuSubtitleProvider : ISubtitleProvider
 
     private void EpisodeAddMultiple(string title, BaseItem item, ScraperSearchInfo searchInfo, AbstractScraper scraper, List<RemoteSubtitleInfo> list)
     {
+        if (item.IndexNumber > searchInfo.EpisodeSize)
+        {
+            return;
+        }
+
         var allName = title;
         var allForceName = title;
         var oneName = title;
-        if (item is Episode && searchInfo.EpisodeSize > 0)
+        if (searchInfo.EpisodeSize > 0)
         {
             oneName += $"【共{searchInfo.EpisodeSize}集】【第{((Episode) item).IndexNumber}集】";
             allName += $"【共{searchInfo.EpisodeSize}集】【只下载未下载的集数】";
