@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using System.Text.RegularExpressions;
 using System.Xml;
+using Jellyfin.Plugin.Danmu.Model;
 using Jellyfin.Plugin.Danmu.Model.Self;
 using MediaBrowser.Controller.Entities;
 
@@ -432,8 +433,17 @@ namespace Jellyfin.Plugin.Danmu.Controllers
 
             if (item is Movie || item is Season)
             {
-                _libraryManagerEventsHelper.QueueItem(item, Model.EventType.Add);
-                _libraryManagerEventsHelper.QueueItem(item, Model.EventType.Update);
+                _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+                {
+                    Item = item,
+                    EventType = EventType.Update,
+                });
+                _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+                {
+                    Item = item,
+                    EventType = EventType.Update,
+                    Force = true,
+                });
             }
 
             if (item is Series)
@@ -441,8 +451,17 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                 var seasons = ((Series)item).GetSeasons(null, new DtoOptions(false));
                 foreach (var season in seasons)
                 {
-                    _libraryManagerEventsHelper.QueueItem(season, Model.EventType.Add);
-                    _libraryManagerEventsHelper.QueueItem(season, Model.EventType.Update);
+                    _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+                    {
+                        Item = season,
+                        EventType = EventType.Add,
+                    });
+                    _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+                    {
+                        Item = season,
+                        EventType = EventType.Update,
+                        Force = true,
+                    });
                 }
             }
 

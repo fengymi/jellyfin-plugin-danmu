@@ -11,6 +11,7 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Hosting;
 using System.Threading;
+using Jellyfin.Plugin.Danmu.Core.Extensions;
 
 namespace Jellyfin.Plugin.Danmu
 {
@@ -72,7 +73,11 @@ namespace Jellyfin.Plugin.Danmu
                 return;
             }
 
-            _libraryManagerEventsHelper.QueueItem(itemChangeEventArgs.Item, EventType.Add);
+            _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+            {
+                Item = itemChangeEventArgs.Item,
+                EventType = EventType.Add,
+            });
         }
 
 
@@ -95,7 +100,11 @@ namespace Jellyfin.Plugin.Danmu
                 return;
             }
 
-            _libraryManagerEventsHelper.QueueItem(itemChangeEventArgs.Item, EventType.Update);
+            // _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+            // {
+            //     Item = itemChangeEventArgs.Item,
+            //     EventType = EventType.Update,
+            // });
         }
 
 
