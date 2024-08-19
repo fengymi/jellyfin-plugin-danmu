@@ -3,6 +3,7 @@ name: "🚀 Publish Plugin"
 on:
   workflow_dispatch:
   push:
+    branches: ["jellyfin/main"]
     tags: ["*"]
 
 env:
@@ -18,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - with:
+          ref: jellyfin/main
       - name: Get tags (For CHANGELOG)
         run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
       - name: Setup dotnet
