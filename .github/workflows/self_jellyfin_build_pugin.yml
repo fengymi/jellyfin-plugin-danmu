@@ -3,7 +3,6 @@ name: "自定义插件打包"
 on:
   workflow_dispatch:
   push:
-#    branches: ["jellyfin/main"]
     tags: ["*"]
 
 env:
