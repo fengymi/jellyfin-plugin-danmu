@@ -121,7 +121,7 @@ public class Youku : AbstractScraper
     }
 
 
-    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id)
+    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null)
     {
         if (string.IsNullOrEmpty(id))
         {

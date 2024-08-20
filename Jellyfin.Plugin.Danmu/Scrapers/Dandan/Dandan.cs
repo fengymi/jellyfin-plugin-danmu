@@ -111,7 +111,7 @@ public class Dandan : AbstractScraper
     }
 
 
-    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id)
+    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null)
     {
         var animeId = id.ToLong();
         if (animeId <= 0)

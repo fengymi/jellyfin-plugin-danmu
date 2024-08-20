@@ -121,7 +121,7 @@ public class Tencent : AbstractScraper
     }
 
 
-    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id)
+    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null)
     {
         if (string.IsNullOrEmpty(id))
         {
@@ -129,7 +129,7 @@ public class Tencent : AbstractScraper
         }
 
         var isMovieItemType = item is MediaBrowser.Controller.Entities.Movies.Movie;
-        var video = await _api.GetVideoAsync(id, CancellationToken.None).ConfigureAwait(false);
+        var video = await _api.GetVideoAsync(id, CancellationToken.None, extra).ConfigureAwait(false);
         if (video == null)
         {
             log.LogInformation("[{0}]获取不到视频信息：id={1}", this.Name, id);

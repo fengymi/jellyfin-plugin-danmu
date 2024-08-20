@@ -52,8 +52,9 @@ public abstract class AbstractScraper
     /// </summary>
     /// <param name="item">元数据item</param>
     /// <param name="id">影片id</param>
+    /// <param name="extra">扩展信息</param>
     /// <returns>影片信息</returns>
-    public abstract Task<ScraperMedia?> GetMedia(BaseItem item, string id);
+    public abstract Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null);
 
     /// <summary>
     /// 需要更新弹幕时调用
