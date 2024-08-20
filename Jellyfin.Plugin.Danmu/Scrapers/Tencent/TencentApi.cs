@@ -23,7 +23,7 @@ public class TencentApi : AbstractApi
 {
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
     private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
-
+    public static ILogger _logger_2;
     /// <summary>
     /// Initializes a new instance of the <see cref="TencentApi"/> class.
     /// </summary>
@@ -31,6 +31,10 @@ public class TencentApi : AbstractApi
     public TencentApi(ILoggerFactory loggerFactory)
         : base(loggerFactory.CreateLogger<TencentApi>())
     {
+        if (_logger_2 == null)
+        {
+            _logger_2 = loggerFactory.CreateLogger<TencentApi>();
+        }
         httpClient.DefaultRequestHeaders.Add("referer", "https://v.qq.com/");
         this.AddCookies("pgv_pvid=40b67e3b06027f3d; video_platform=2; vversion_name=8.2.95; video_bucketid=4; video_omgid=0a1ff6bc9407c0b1cff86ee5d359614d", new Uri("https://v.qq.com"));
     }
@@ -118,7 +122,6 @@ public class TencentApi : AbstractApi
                     videoInfo.EpisodeList.AddRange(await this.GetVideoAsyncWithNext(id, cancellationToken, tencentModuleModuleParams.ParamsTabs[i].PageContext).ConfigureAwait(false));
                 }
             }
-
             _memoryCache.Set<TencentVideo?>(cacheKey, videoInfo, expiredOption);
             return videoInfo;
         }

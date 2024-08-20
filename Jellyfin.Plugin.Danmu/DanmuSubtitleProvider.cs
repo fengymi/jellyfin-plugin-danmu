@@ -63,13 +63,13 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             {
                 Dictionary<string, object?> extra = new Dictionary<string, object?> { { "indexNumber", item.IndexNumber } };
                 var scraperMedia = await scraper.GetMedia(item, info.Id, extra).ConfigureAwait(false);
-                if (scraperMedia == null || scraperMedia.Episodes == null || scraperMedia.Episodes.Count <= item.IndexNumber)
+                if (scraperMedia == null || scraperMedia.Episodes == null || scraperMedia.Episodes.Count < item.IndexNumber)
                 {
                     throw new Exception($"查询信息失败");
                 }
 
-                int itemIndexNumber = item.IndexNumber ?? 0;
-                ScraperEpisode scraperMediaEpisode = scraperMedia.Episodes[itemIndexNumber];
+                int itemIndexNumber = item.IndexNumber ?? 1;
+                ScraperEpisode scraperMediaEpisode = scraperMedia.Episodes[itemIndexNumber - 1];
                 thirdScraperId = scraperMediaEpisode.Id;
             }
 

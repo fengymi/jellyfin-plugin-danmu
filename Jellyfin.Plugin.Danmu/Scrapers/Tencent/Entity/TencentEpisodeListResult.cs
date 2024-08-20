@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Danmu.Scrapers.Tencent.Entity;
 
@@ -72,13 +73,24 @@ class TabDataConverter : JsonConverter<List<TencentModuleParamsTab>>
     public override List<TencentModuleParamsTab>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         string? originStr = reader.GetString();
-        if (originStr == null)
+        if (string.IsNullOrEmpty(originStr))
         {
             return null;
         }
+        
+        TencentApi._logger_2.LogInformation("获取json数据 originStr={originStr}", originStr);
+        try
+        {
 
-        List<TencentModuleParamsTab>? array = JsonSerializer.Deserialize<List<TencentModuleParamsTab>>(originStr);
-        return array;
+            List<TencentModuleParamsTab>? array = JsonSerializer.Deserialize<List<TencentModuleParamsTab>>(originStr);
+            return array;
+        }
+        catch (Exception e)
+        {
+            TencentApi._logger_2.LogError(e, "解析json失败 originStr={originStr}", originStr);
+        }
+
+        return null;
     }
 
     /// <inheritdoc/>
