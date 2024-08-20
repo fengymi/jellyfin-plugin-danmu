@@ -15,10 +15,12 @@ using Jellyfin.Plugin.Danmu.Scrapers;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Xml;
 using Jellyfin.Plugin.Danmu.Model;
 using Jellyfin.Plugin.Danmu.Model.Self;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Model.Entities;
 
 namespace Jellyfin.Plugin.Danmu.Controllers
 {
@@ -206,6 +208,31 @@ namespace Jellyfin.Plugin.Danmu.Controllers
 
             return danmuResultDto;
         }
+
+        /// <summary>
+        /// 查找弹幕
+        /// </summary>
+        [Route("/api/danmu/providers/{id}")]
+        [HttpGet]
+        public async Task<object> GetProviderId(string id, string? value)
+        {
+            _logger.LogInformation("请求参数 id={0}", id);
+            var currentItem = this._libraryManager.GetItemById(id);
+            if (currentItem == null)
+            {
+                return "数据为空";
+            }
+
+            if (!string.IsNullOrEmpty(value))
+            {
+                currentItem.ProviderIds["TestId"] = value;
+                await currentItem.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            _logger.LogInformation("返回 ProviderIds={0}, database={1}", currentItem.ProviderIds.ToJson(), _libraryManager.GetItemById(id).ProviderIds);
+            return currentItem.ProviderIds;
+        }
+
 
         /// <summary>
         /// 查找弹幕
@@ -442,7 +469,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                 {
                     Item = item,
                     EventType = EventType.Update,
-                    Force = true,
+                    Refresh = true,
                 });
             }
 
@@ -460,7 +487,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                     {
                         Item = season,
                         EventType = EventType.Update,
-                        Force = true,
+                        Refresh = true,
                     });
                 }
             }

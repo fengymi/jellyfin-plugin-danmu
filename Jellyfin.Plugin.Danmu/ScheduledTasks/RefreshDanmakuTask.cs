@@ -104,10 +104,10 @@ namespace Jellyfin.Plugin.Danmu.ScheduledTasks
                     switch (item)
                     {
                         case Movie:
-                            await _libraryManagerEventsHelper.ProcessQueuedMovieEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update } }, EventType.Update).ConfigureAwait(false);
+                            await _libraryManagerEventsHelper.ProcessQueuedMovieEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update, Refresh = true } }, EventType.Update).ConfigureAwait(false);
                             break;
                         case Season:
-                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update, Force = true } }).ConfigureAwait(false);
+                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update, Refresh = true } }).ConfigureAwait(false);
                             break;
                     }
                     successCount++;

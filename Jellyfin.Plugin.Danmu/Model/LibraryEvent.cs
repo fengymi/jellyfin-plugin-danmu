@@ -13,7 +13,12 @@ public class LibraryEvent
     public string Id { get; set; }
 
     /**
-     * 强制下载
+     * 刷新 重新下载 (如果有id，使用原有id)
+     */
+    public bool Refresh { get; set; } = true;
+
+    /**
+     * 强制重新下载 (强制重新匹配id下载)
      */
     public bool Force { get; set; }
 

@@ -61,7 +61,8 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             string thirdScraperId = info.Id;
             if (!info.All && item is Episode)
             {
-                var scraperMedia = await scraper.GetMedia(item, info.Id).ConfigureAwait(false);
+                Dictionary<string, object?> extra = new Dictionary<string, object?> { { "indexNumber", item.IndexNumber } };
+                var scraperMedia = await scraper.GetMedia(item, info.Id, extra).ConfigureAwait(false);
                 if (scraperMedia == null || scraperMedia.Episodes == null || scraperMedia.Episodes.Count <= item.IndexNumber)
                 {
                     throw new Exception($"查询信息失败");
@@ -91,6 +92,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
                 ProviderId = info.ProviderId,
                 All = info.All,
                 Force = info.Force,
+                Refresh = info.Refresh,
             };
 
             this._libraryManagerEventsHelper.QueueItem(libraryEvent);
@@ -199,6 +201,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             Id = searchInfo.Id.ToString(),
             ProviderId = scraper.ProviderId,
             Force = force,
+            Refresh = force,
             All = all,
         };
         list.Add(new RemoteSubtitleInfo()

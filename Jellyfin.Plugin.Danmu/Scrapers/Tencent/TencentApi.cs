@@ -23,7 +23,6 @@ public class TencentApi : AbstractApi
 {
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
     private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
-    public static ILogger _logger_2;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TencentApi"/> class.
@@ -32,7 +31,6 @@ public class TencentApi : AbstractApi
     public TencentApi(ILoggerFactory loggerFactory)
         : base(loggerFactory.CreateLogger<TencentApi>())
     {
-        _logger_2 = loggerFactory.CreateLogger<TencentApi>();
         httpClient.DefaultRequestHeaders.Add("referer", "https://v.qq.com/");
         this.AddCookies("pgv_pvid=40b67e3b06027f3d; video_platform=2; vversion_name=8.2.95; video_bucketid=4; video_omgid=0a1ff6bc9407c0b1cff86ee5d359614d", new Uri("https://v.qq.com"));
     }
@@ -84,7 +82,7 @@ public class TencentApi : AbstractApi
         return result;
     }
 
-    public async Task<TencentVideo?> GetVideoAsync(string id, CancellationToken cancellationToken, Dictionary<string, object>? extra = null)
+    public async Task<TencentVideo?> GetVideoAsync(string id, CancellationToken cancellationToken, Dictionary<string, object?>? extra = null)
     {
         if (string.IsNullOrEmpty(id))
         {
@@ -98,6 +96,8 @@ public class TencentApi : AbstractApi
             return video;
         }
 
+        // 如果指定获取某集数据，从0到当前集数
+        int indexNumber = (int)(extra?["indexNumber"] ?? Int32.MaxValue);
         var postData = new TencentEpisodeListRequest() { PageParams = new TencentPageParams() { Cid = id } };
         var url = $"https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
         var response = await httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
@@ -113,7 +113,7 @@ public class TencentApi : AbstractApi
             videoInfo.EpisodeList = new List<TencentEpisode>(tencentModule.ItemDataLists.ItemDatas.Select(x => x.ItemParams).Where(x => x.IsTrailer != "1").ToList());
             if (tencentModuleModuleParams?.ParamsTabs?.Count >= 1)
             {
-                for (int i = 1; i < tencentModuleModuleParams.ParamsTabs.Count; i++)
+                for (int i = 1; indexNumber >= videoInfo.EpisodeList.Count && i < tencentModuleModuleParams.ParamsTabs.Count; i++)
                 {
                     videoInfo.EpisodeList.AddRange(await this.GetVideoAsyncWithNext(id, cancellationToken, tencentModuleModuleParams.ParamsTabs[i].PageContext).ConfigureAwait(false));
                 }

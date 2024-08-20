@@ -62,7 +62,9 @@ namespace Jellyfin.Plugin.Danmu
         private void LibraryManagerItemAdded(object sender, ItemChangeEventArgs itemChangeEventArgs)
         {
             // Don't do anything if it's not a supported media type
-            if (itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season)
+            bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season;
+            // bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode;
+            if (supportItemTypes)
             {
                 return;
             }
@@ -77,6 +79,7 @@ namespace Jellyfin.Plugin.Danmu
             {
                 Item = itemChangeEventArgs.Item,
                 EventType = EventType.Add,
+                Refresh = false,
             });
         }
 
@@ -89,7 +92,9 @@ namespace Jellyfin.Plugin.Danmu
         private void LibraryManagerItemUpdated(object sender, ItemChangeEventArgs itemChangeEventArgs)
         {
             // Don't do anything if it's not a supported media type
-            if (itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season)
+            bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season;
+            // bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode;
+            if (supportItemTypes)
             {
                 return;
             }
@@ -100,11 +105,12 @@ namespace Jellyfin.Plugin.Danmu
                 return;
             }
 
-            // _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
-            // {
-            //     Item = itemChangeEventArgs.Item,
-            //     EventType = EventType.Update,
-            // });
+            this._libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+            {
+                Item = itemChangeEventArgs.Item,
+                EventType = EventType.Update,
+                Refresh = false,
+            });
         }
 
 
