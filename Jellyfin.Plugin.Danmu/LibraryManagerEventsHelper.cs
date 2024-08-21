@@ -822,7 +822,8 @@ public class LibraryManagerEventsHelper : IDisposable
             return false;
         }
 
-        try {
+        try
+        {
             // 获取匹配的查询器和id
             if (!string.IsNullOrEmpty(espisodeThirdProviderId))
             {
@@ -888,6 +889,14 @@ public class LibraryManagerEventsHelper : IDisposable
                 {
                     item.SetProviderId(scraper.ProviderId, epId);
                     queueUpdateMeta.Add(item);
+                }
+
+                // 如果存在新的id，将id更新到数据库上
+                string? originProviderId = season.GetProviderId(scraper.ProviderId);
+                if (string.IsNullOrEmpty(originProviderId) && !string.Equals(media.Id, originProviderId, StringComparison.Ordinal))
+                {
+                    season.SetProviderId(scraper.ProviderId, media.Id);
+                    queueUpdateMeta.Add(season);
                 }
 
                 // 下载弹幕
