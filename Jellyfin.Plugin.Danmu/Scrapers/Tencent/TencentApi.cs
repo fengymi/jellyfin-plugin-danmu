@@ -95,7 +95,7 @@ public class TencentApi : AbstractApi
 
         var cacheKey = $"media_{id}";
         var expiredOption = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) };
-        if (_memoryCache.TryGetValue<TencentVideo?>(cacheKey, out var video))
+        if (this._memoryCache.TryGetValue<TencentVideo?>(cacheKey, out var video))
         {
             return video;
         }
