@@ -61,6 +61,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
         [Route("/plugin/danmu/{id}")]
         [Route("/api/danmu/{id}")]
         [HttpGet]
+        [HttpPost]
         public async Task<DanmuFileInfo> Get(string id)
         {
             if (string.IsNullOrEmpty(id))
@@ -74,15 +75,19 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                 return new DanmuFileInfo();
             }
 
-            var danmuPath = Path.Combine(currentItem.ContainingFolderPath, currentItem.FileNameWithoutExtension + ".xml");
-            var fileMeta = _fileSystem.GetFileInfo(danmuPath);
-            if (!fileMeta.Exists)
+            var abstractScrapers = this._scraperManager.All();
+            foreach (AbstractScraper iter in abstractScrapers)
             {
-                return new DanmuFileInfo();
+                var danmuPath = currentItem.GetDanmuXmlPath(iter.ProviderId);
+                var fileMeta = _fileSystem.GetFileInfo(danmuPath);
+                if (fileMeta.Exists)
+                {
+                    var domain = Request.Scheme + System.Uri.SchemeDelimiter + Request.Host;
+                    return new DanmuFileInfo() { Url = string.Format("{0}/api/danmu/{1}/raw", domain, id) };
+                }
             }
 
-            var domain = Request.Scheme + System.Uri.SchemeDelimiter + Request.Host;
-            return new DanmuFileInfo() { Url = string.Format("{0}/api/danmu/{1}/raw", domain, id) };
+            return new DanmuFileInfo();
         }
 
         /// <summary>
@@ -92,6 +97,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
         [Route("/plugin/danmu/raw/{id}")]
         [Route("/api/danmu/{id}/raw")]
         [HttpGet]
+        [HttpPost]
         public async Task<ActionResult> Download(string id)
         {
             if (string.IsNullOrEmpty(id))
@@ -99,20 +105,24 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                 throw new ResourceNotFoundException();
             }
 
-            var currentItem = _libraryManager.GetItemById(id);
+            var currentItem = this._libraryManager.GetItemById(id);
             if (currentItem == null)
             {
                 throw new ResourceNotFoundException();
             }
 
-            var danmuPath = Path.Combine(currentItem.ContainingFolderPath, currentItem.FileNameWithoutExtension + ".xml");
-            var fileMeta = _fileSystem.GetFileInfo(danmuPath);
-            if (!fileMeta.Exists)
+            var abstractScrapers = this._scraperManager.All();
+            foreach (AbstractScraper iter in abstractScrapers)
             {
-                throw new ResourceNotFoundException();
+                var danmuPath = currentItem.GetDanmuXmlPath(iter.ProviderId);
+                var fileMeta = this._fileSystem.GetFileInfo(danmuPath);
+                if (fileMeta.Exists)
+                {
+                    return File(System.IO.File.ReadAllBytes(danmuPath), "text/xml");
+                }
             }
 
-            return File(System.IO.File.ReadAllBytes(danmuPath), "text/xml");
+            throw new ResourceNotFoundException();
         }
 
         /// <summary>
@@ -536,12 +546,12 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                     danmuEventDtos.Add(danmuEvent);
                 }
             }
-            
+
             if (danmuSourceDto.Source == null)
             {
                 return Task.FromResult<DanmuSourceDto>(null);
             }
-            
+
             danmuSourceDto.DanmuEvents = danmuEventDtos;
             return Task.FromResult(danmuSourceDto);
         }

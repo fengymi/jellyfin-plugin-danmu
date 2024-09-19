@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.Danmu.Core.Extensions;
 public static class BaseItemExtension
 {
     
-    public static string GetDanmuXmlPath(this BaseItem item, string providerId)
+    public static string GetDanmuXmlPath(this BaseItem item, string providerId = "")
     {
         if (string.IsNullOrEmpty(providerId))
         {
@@ -15,7 +15,7 @@ public static class BaseItemExtension
         return Path.Combine(item.ContainingFolderPath, item.FileNameWithoutExtension + "_" + providerId + ".xml");
     }
     
-    public static string GetDanmuAssPath(this BaseItem item, string providerId)
+    public static string GetDanmuAssPath(this BaseItem item, string providerId = "")
     {
         if (string.IsNullOrEmpty(providerId))
         {
