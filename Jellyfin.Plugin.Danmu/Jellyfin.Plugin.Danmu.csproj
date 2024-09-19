@@ -23,10 +23,6 @@
     </PackageReference>
     <PackageReference Include="Jellyfin.Controller" Version="10.9.0" />
     <PackageReference Include="Jellyfin.Model" Version="10.9.0" />
-<<<<<<< HEAD
-    
-=======
->>>>>>> origin_cxfksword/main
     <PackageReference Include="RateLimiter" Version="2.2.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
   </ItemGroup>
@@ -39,23 +35,6 @@
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
   </ItemGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-<!--    <Exec Command="cp $(TargetPath) '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/'"/>-->
-<!--    <Exec Command="cp /Users/fengymi/RiderProjects/danmu/jellyfin-plugin-danmu/Jellyfin.Plugin.Danmu/bin/Release/net8.0/Jellyfin.Plugin.Danmu.dll '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/'"/>-->
-<!--    <Exec Command="killall 'Jellyfin Server'" ContinueOnError="true"/>-->
-<!--    <Exec Command="open -a jellyfin"/>-->
-    <!--
-    mkdir -p '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' &&\ 
-     cp -f /Users/fengymi/RiderProjects/danmu/jellyfin-plugin-danmu/Jellyfin.Plugin.Danmu/bin/Release/net8.0/Jellyfin.Plugin.Danmu.dll '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/' &&\ 
-     killall 'Jellyfin Server' &&\
-      killall jellyfin &&\
-      open -a jellyfin
-    -->  
-  </Target>
-    <PackageReference Include="Jellyfin.Controller" Version="10.9.0" />
-    <PackageReference Include="Jellyfin.Model" Version="10.9.0" />
-    
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
 <!--    <Exec Command="cp $(TargetPath) '/Users/fengymi/Library/Application Support/jellyfin/plugins/Danmu/'"/>-->
