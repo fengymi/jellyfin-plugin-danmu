@@ -92,27 +92,63 @@ public class TencentApi : AbstractApi
 
         var cacheKey = $"media_{id}";
         var expiredOption = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) };
-        if (_memoryCache.TryGetValue<TencentVideo?>(cacheKey, out var video))
+        if (this._memoryCache.TryGetValue<TencentVideo?>(cacheKey, out var video))
         {
             return video;
         }
 
-        var postData = new TencentEpisodeListRequest() { PageParams = new TencentPageParams() { Cid = id } };
-        var url = $"https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
-        var response = await httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<TencentEpisodeListResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
-        if (result != null && result.Data != null && result.Data.ModuleListDatas != null)
+        var episodeList = new List<TencentEpisode>();
+        var pageSize = 100;
+        var beginNum = 1;
+        var endNum = pageSize;
+        var nextPageContext = string.Empty;
+        var lastId = string.Empty;
+        do
         {
+            var postData = new TencentEpisodeListRequest() { PageParams = new TencentPageParams() { Cid = id, PageSize = $"{pageSize}", PageContext = nextPageContext } };
+            var url = "https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
+            var response = await this.httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+
+            nextPageContext = string.Empty;
+            var result = await response.Content.ReadFromJsonAsync<TencentEpisodeListResult>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
+            if (result != null && result.Data != null && result.Data.ModuleListDatas != null
+                && result.Data.ModuleListDatas.First().ModuleDatas != null
+                && result.Data.ModuleListDatas.First().ModuleDatas.First().ItemDataLists != null)
+            {
+                var episodes = result.Data.ModuleListDatas.First().ModuleDatas.First()
+                    .ItemDataLists.ItemDatas.Select(x => x.ItemParams)
+                    .Where(x => x.IsTrailer != "1" && !x.Title.Contains("直拍") && !x.Title.Contains("彩蛋") && !x.Title.Contains("直播回顾"))
+                    .ToList();
+                // 判断下数据是否相同，避免 api 更新导致死循环
+                if (episodes.Count > 0 && episodes.Last().Vid == lastId)
+                {
+                    break;
+                }
+
+                episodeList.AddRange(episodes);
+                if (result.Data.ModuleListDatas.First().ModuleDatas.First().ItemDataLists.ItemDatas.Count == pageSize)
+                {
+                    beginNum += pageSize;
+                    endNum += pageSize;
+                    nextPageContext = $"episode_begin={beginNum}&episode_end={endNum}&episode_step={pageSize}";
+                    lastId = episodeList.Last().Vid;
+
+                    // 等待一段时间避免 api 请求太快
+                    await this._delayExecuteConstraint;
+                }
+            }
+        } while (!string.IsNullOrEmpty(nextPageContext));
+
+        if (episodeList.Count > 0) {
             var videoInfo = new TencentVideo();
             videoInfo.Id = id;
-            videoInfo.EpisodeList = result.Data.ModuleListDatas.First().ModuleDatas.First().ItemDataLists.ItemDatas.Select(x => x.ItemParams).Where(x => x.IsTrailer != "1").ToList();
-            _memoryCache.Set<TencentVideo?>(cacheKey, videoInfo, expiredOption);
+            videoInfo.EpisodeList = episodeList;
+            this._memoryCache.Set<TencentVideo?>(cacheKey, videoInfo, expiredOption);
             return videoInfo;
         }
 
-        _memoryCache.Set<TencentVideo?>(cacheKey, null, expiredOption);
+        this._memoryCache.Set<TencentVideo?>(cacheKey, null, expiredOption);
         return null;
     }
 
