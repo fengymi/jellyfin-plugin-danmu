@@ -11,6 +11,7 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Hosting;
 using System.Threading;
+using Jellyfin.Plugin.Danmu.Core.Extensions;
 
 namespace Jellyfin.Plugin.Danmu
 {
@@ -61,7 +62,9 @@ namespace Jellyfin.Plugin.Danmu
         private void LibraryManagerItemAdded(object sender, ItemChangeEventArgs itemChangeEventArgs)
         {
             // Don't do anything if it's not a supported media type
-            if (itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season)
+            bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season;
+            // bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode;
+            if (supportItemTypes)
             {
                 return;
             }
@@ -72,7 +75,12 @@ namespace Jellyfin.Plugin.Danmu
                 return;
             }
 
-            _libraryManagerEventsHelper.QueueItem(itemChangeEventArgs.Item, EventType.Add);
+            _libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+            {
+                Item = itemChangeEventArgs.Item,
+                EventType = EventType.Add,
+                Refresh = false,
+            });
         }
 
 
@@ -84,7 +92,9 @@ namespace Jellyfin.Plugin.Danmu
         private void LibraryManagerItemUpdated(object sender, ItemChangeEventArgs itemChangeEventArgs)
         {
             // Don't do anything if it's not a supported media type
-            if (itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season)
+            bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode and not Series and not Season;
+            // bool supportItemTypes = itemChangeEventArgs.Item is not Movie and not Episode;
+            if (supportItemTypes)
             {
                 return;
             }
@@ -95,7 +105,12 @@ namespace Jellyfin.Plugin.Danmu
                 return;
             }
 
-            _libraryManagerEventsHelper.QueueItem(itemChangeEventArgs.Item, EventType.Update);
+            this._libraryManagerEventsHelper.QueueItem(new LibraryEvent()
+            {
+                Item = itemChangeEventArgs.Item,
+                EventType = EventType.Update,
+                Refresh = false,
+            });
         }
 
 

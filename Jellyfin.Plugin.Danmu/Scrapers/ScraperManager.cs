@@ -25,6 +25,16 @@ public class ScraperManager
         this._scrapers.AddRange(scrapers);
     }
 
+    public ReadOnlyCollection<AbstractScraper> AllWithNoEnabled()
+    {
+        if (_scrapers == null)
+        {
+            return new List<AbstractScraper>().AsReadOnly();
+        }
+
+        return _scrapers.AsReadOnly();
+    }
+
     public ReadOnlyCollection<AbstractScraper> All()
     {
         // 存在配置时，根据配置调整源顺序，并删除不启用的源

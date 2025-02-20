@@ -101,9 +101,9 @@ namespace Jellyfin.Plugin.Danmu.ScheduledTasks
                             break;
                         case Season:
                             // 搜索匹配season的元数据
-                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Add } }, EventType.Add).ConfigureAwait(false);
+                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Add } }).ConfigureAwait(false);
                             // 下载剧集弹幕
-                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update } }, EventType.Update).ConfigureAwait(false);
+                            await _libraryManagerEventsHelper.ProcessQueuedSeasonEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Update } }).ConfigureAwait(false);
                             break;
                             // case Series:
                             //     await _libraryManagerEventsHelper.ProcessQueuedShowEvents(new List<LibraryEvent>() { new LibraryEvent { Item = item, EventType = EventType.Add } }, EventType.Add).ConfigureAwait(false);

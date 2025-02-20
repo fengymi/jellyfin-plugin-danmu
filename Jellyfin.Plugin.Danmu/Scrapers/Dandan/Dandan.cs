@@ -111,7 +111,7 @@ public class Dandan : AbstractScraper
     }
 
 
-    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id)
+    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null)
     {
         var animeId = id.ToLong();
         if (animeId <= 0)
@@ -186,6 +186,7 @@ public class Dandan : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = cid;
         danmaku.ChatServer = "api.dandanplay.net";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
             var danmakuText = new ScraperDanmakuText();

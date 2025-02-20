@@ -23,8 +23,7 @@ public class TencentApi : AbstractApi
 {
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
     private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
-
-
+    public static ILogger _logger_2;
     /// <summary>
     /// Initializes a new instance of the <see cref="TencentApi"/> class.
     /// </summary>
@@ -32,6 +31,10 @@ public class TencentApi : AbstractApi
     public TencentApi(ILoggerFactory loggerFactory)
         : base(loggerFactory.CreateLogger<TencentApi>())
     {
+        if (_logger_2 == null)
+        {
+            _logger_2 = loggerFactory.CreateLogger<TencentApi>();
+        }
         httpClient.DefaultRequestHeaders.Add("referer", "https://v.qq.com/");
         this.AddCookies("pgv_pvid=40b67e3b06027f3d; video_platform=2; vversion_name=8.2.95; video_bucketid=4; video_omgid=0a1ff6bc9407c0b1cff86ee5d359614d", new Uri("https://v.qq.com"));
     }
@@ -83,7 +86,7 @@ public class TencentApi : AbstractApi
         return result;
     }
 
-    public async Task<TencentVideo?> GetVideoAsync(string id, CancellationToken cancellationToken)
+    public async Task<TencentVideo?> GetVideoAsync(string id, CancellationToken cancellationToken, Dictionary<string, object?>? extra = null)
     {
         if (string.IsNullOrEmpty(id))
         {
@@ -97,63 +100,61 @@ public class TencentApi : AbstractApi
             return video;
         }
 
-        var episodeList = new List<TencentEpisode>();
-        var pageSize = 100;
-        var beginNum = 1;
-        var endNum = pageSize;
-        var nextPageContext = string.Empty;
-        var lastId = string.Empty;
-        do
+        // 如果指定获取某集数据，从0到当前集数
+        int indexNumber = (int)(extra?["indexNumber"] ?? Int32.MaxValue);
+        var postData = new TencentEpisodeListRequest() { PageParams = new TencentPageParams() { Cid = id } };
+        var url = $"https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
+        var response = await httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<TencentEpisodeListResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
+        if (result != null && result.Data != null && result.Data.ModuleListDatas != null)
         {
-            var postData = new TencentEpisodeListRequest() { PageParams = new TencentPageParams() { Cid = id, PageSize = $"{pageSize}", PageContext = nextPageContext } };
-            var url = "https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
-            var response = await this.httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            nextPageContext = string.Empty;
-            var result = await response.Content.ReadFromJsonAsync<TencentEpisodeListResult>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
-            if (result != null && result.Data != null && result.Data.ModuleListDatas != null
-                && result.Data.ModuleListDatas.First().ModuleDatas != null
-                && result.Data.ModuleListDatas.First().ModuleDatas.First().ItemDataLists != null)
-            {
-                var episodes = result.Data.ModuleListDatas.First().ModuleDatas.First()
-                    .ItemDataLists.ItemDatas.Select(x => x.ItemParams)
-                    .Where(x => x.IsTrailer != "1" && !x.Title.Contains("直拍") && !x.Title.Contains("彩蛋") && !x.Title.Contains("直播回顾"))
-                    .ToList();
-                // 判断下数据是否相同，避免 api 更新导致死循环
-                if (episodes.Count > 0 && episodes.Last().Vid == lastId)
-                {
-                    break;
-                }
-
-                episodeList.AddRange(episodes);
-                if (result.Data.ModuleListDatas.First().ModuleDatas.First().ItemDataLists.ItemDatas.Count == pageSize)
-                {
-                    beginNum += pageSize;
-                    endNum += pageSize;
-                    nextPageContext = $"episode_begin={beginNum}&episode_end={endNum}&episode_step={pageSize}";
-                    lastId = episodeList.Last().Vid;
-
-                    // 等待一段时间避免 api 请求太快
-                    await this._delayExecuteConstraint;
-                }
-            }
-        } while (!string.IsNullOrEmpty(nextPageContext));
-
-        if (episodeList.Count > 0) {
+            TencentModule tencentModule = result.Data.ModuleListDatas.First().ModuleDatas.First();
+            TencentModuleParams tencentModuleModuleParams = tencentModule.ModuleParams;
             var videoInfo = new TencentVideo();
             videoInfo.Id = id;
-            videoInfo.EpisodeList = episodeList;
-            this._memoryCache.Set<TencentVideo?>(cacheKey, videoInfo, expiredOption);
+            videoInfo.EpisodeList = new List<TencentEpisode>(tencentModule.ItemDataLists.ItemDatas.Select(x => x.ItemParams).Where(x => x.IsTrailer != "1").ToList());
+            if (tencentModuleModuleParams?.ParamsTabs?.Count >= 1)
+            {
+                for (int i = 1; indexNumber >= videoInfo.EpisodeList.Count && i < tencentModuleModuleParams.ParamsTabs.Count; i++)
+                {
+                    videoInfo.EpisodeList.AddRange(await this.GetVideoAsyncWithNext(id, cancellationToken, tencentModuleModuleParams.ParamsTabs[i].PageContext).ConfigureAwait(false));
+                }
+            }
+            _memoryCache.Set<TencentVideo?>(cacheKey, videoInfo, expiredOption);
             return videoInfo;
         }
 
-        this._memoryCache.Set<TencentVideo?>(cacheKey, null, expiredOption);
+        _memoryCache.Set<TencentVideo?>(cacheKey, null, expiredOption);
         return null;
     }
 
+    private async Task<List<TencentEpisode>> GetVideoAsyncWithNext(string id, CancellationToken cancellationToken, string? pageContext)
+    {
+        if (pageContext == null)
+        {
+            return new List<TencentEpisode>();
+        }
 
+        var tencentPageParams = new TencentPageParams() { Cid = id };
+        tencentPageParams.PageSize = string.Empty;
+        tencentPageParams.PageContext = pageContext;
 
+        var postData = new TencentEpisodeListRequest() { PageParams = tencentPageParams };
+        var url = $"https://pbaccess.video.qq.com/trpc.universal_backend_service.page_server_rpc.PageServer/GetPageData?video_appid=3000010&vplatform=2";
+        var response = await httpClient.PostAsJsonAsync<TencentEpisodeListRequest>(url, postData, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<TencentEpisodeListResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
+        if (result != null && result.Data != null && result.Data.ModuleListDatas != null)
+        {
+            TencentModule tencentModule = result.Data.ModuleListDatas.First().ModuleDatas.First();
+            return tencentModule.ItemDataLists.ItemDatas.Select(x => x.ItemParams).Where(x => x.IsTrailer != "1").ToList();;
+        }
+
+        return new List<TencentEpisode>();
+    }
 
     public async Task<List<TencentComment>> GetDanmuContentAsync(string vid, CancellationToken cancellationToken)
     {

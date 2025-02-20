@@ -122,7 +122,7 @@ public class Mgtv : AbstractScraper
     }
 
 
-    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id)
+    public override async Task<ScraperMedia?> GetMedia(BaseItem item, string id, Dictionary<string, object?>? extra = null)
     {
         if (string.IsNullOrEmpty(id))
         {
@@ -201,6 +201,7 @@ public class Mgtv : AbstractScraper
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = vid.ToLong();
         danmaku.ChatServer = "galaxy.bz.mgtv.com";
+        danmaku.ProviderId = this.ProviderId;
         foreach (var comment in comments)
         {
 
