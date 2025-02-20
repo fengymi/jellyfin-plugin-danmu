@@ -3,20 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Jellyfin.Extensions.Json;
-using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller;
 using Microsoft.Extensions.Logging;
-using Jellyfin.Plugin.Danmu.Model;
 using System.Threading;
-using MediaBrowser.Controller.Entities.Movies;
-using MediaBrowser.Common.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
-using System.Net;
 using System.Web;
 using Microsoft.Extensions.Caching.Memory;
 using Jellyfin.Plugin.Danmu.Scrapers.Dandan.Entity;
@@ -27,6 +18,8 @@ namespace Jellyfin.Plugin.Danmu.Scrapers.Dandan;
 
 public class DandanApi : AbstractApi
 {
+    const string API_ID = "";
+    const string API_SECRET = "";
     private static readonly object _lock = new object();
     private DateTime lastRequestTime = DateTime.Now.AddDays(-1);
 
@@ -35,6 +28,32 @@ public class DandanApi : AbstractApi
         get
         {
             return Plugin.Instance?.Configuration.Dandan ?? new DandanOption();
+        }
+    }
+
+    protected string ApiID {
+        get
+        {
+            var apiId = Environment.GetEnvironmentVariable("DANDAN_API_ID");
+            if (!string.IsNullOrEmpty(apiId))
+            {
+                return apiId;
+            }
+
+            return API_ID;
+        }
+    }
+
+    protected string ApiSecret {
+        get
+        {
+            var apiSecret = Environment.GetEnvironmentVariable("DANDAN_API_SECRET");
+            if (!string.IsNullOrEmpty(apiSecret))
+            {
+                return apiSecret;
+            }
+
+            return API_SECRET;
         }
     }
 
@@ -67,8 +86,7 @@ public class DandanApi : AbstractApi
 
         keyword = HttpUtility.UrlEncode(keyword);
         var url = $"https://api.dandanplay.net/api/v2/search/anime?keyword={keyword}";
-        var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<SearchResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Success)
         {
@@ -95,8 +113,7 @@ public class DandanApi : AbstractApi
         }
 
         var url = $"https://api.dandanplay.net/api/v2/bangumi/{animeId}";
-        var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync<AnimeResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Success && result.Bangumi != null)
@@ -125,8 +142,7 @@ public class DandanApi : AbstractApi
         var withRelated = this.Config.WithRelatedDanmu ? "true" : "false";
         var chConvert = this.Config.ChConvert;
         var url = $"https://api.dandanplay.net/api/v2/comment/{epId}?withRelated={withRelated}&chConvert={chConvert}";
-        var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<CommentResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null)
         {
@@ -150,6 +166,40 @@ public class DandanApi : AbstractApi
         {
             this._logger.LogDebug("请求太频繁，等待{0}毫秒后继续执行...", diff);
             Thread.Sleep(diff);
+        }
+    }
+
+    protected async Task<HttpResponseMessage> Request(string url, CancellationToken cancellationToken)
+    {
+        var timestamp = DateTimeOffset.Now.ToUnixTimeSeconds();
+        var signature = GenerateSignature(url, timestamp);
+
+        HttpResponseMessage response;
+        using (var request = new HttpRequestMessage(HttpMethod.Get, url)) {
+            request.Headers.Add("X-AppId", ApiID);
+            request.Headers.Add("X-Signature", signature);
+            request.Headers.Add("X-Timestamp", timestamp.ToString());
+            response = await this.httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+        }
+
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
+    protected string GenerateSignature(string url, long timestamp)
+    {
+        if (string.IsNullOrEmpty(ApiID) || string.IsNullOrEmpty(ApiSecret))
+        {
+            throw new Exception("弹弹接口缺少API_ID和API_SECRET");
+        }
+        var uri = new Uri(url);
+        var path = uri.AbsolutePath;
+        var str = $"{ApiID}{timestamp}{path}{ApiSecret}";
+        using (var sha256 = SHA256.Create())
+        {
+            var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(str));
+            return Convert.ToBase64String(hashBytes);
         }
     }
 
