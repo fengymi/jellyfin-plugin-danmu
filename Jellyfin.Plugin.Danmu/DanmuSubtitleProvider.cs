@@ -130,14 +130,14 @@ public class DanmuSubtitleProvider : ISubtitleProvider
         {
             item.Name = request.SeriesName;
         }
-
+        
+        _logger.LogInformation("关键字查询弹幕信息 Search={keyword}", request.SeriesName);
         foreach (var scraper in _scraperManager.All())
         {
             try
             {
 
                 var result = await scraper.Search(item);
-                _logger.LogInformation("DanmuSubtitleProvider Search result={result}", result.ToJson());
                 foreach (var searchInfo in result)
                 {
                     var title = searchInfo.Name;
