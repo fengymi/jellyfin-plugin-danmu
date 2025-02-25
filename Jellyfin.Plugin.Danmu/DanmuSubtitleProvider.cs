@@ -137,6 +137,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             {
 
                 var result = await scraper.Search(item);
+                _logger.LogInformation("DanmuSubtitleProvider Search result={result}", result.ToJson());
                 foreach (var searchInfo in result)
                 {
                     var title = searchInfo.Name;
@@ -172,7 +173,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
 
     private void EpisodeAddMultiple(string title, BaseItem item, ScraperSearchInfo searchInfo, AbstractScraper scraper, List<RemoteSubtitleInfo> list)
     {
-        if (item.IndexNumber > searchInfo.EpisodeSize)
+        if (searchInfo.EpisodeSize > 0 && item.IndexNumber > searchInfo.EpisodeSize)
         {
             return;
         }
