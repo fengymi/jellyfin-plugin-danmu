@@ -191,7 +191,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
         {
             oneName += $"【第{((Episode)item).IndexNumber}集】";
             allName += "【只下载未下载的集数】";
-            allForceName += "强制更新全部集数】";
+            allForceName += "【强制更新全部集数】";
         }
 
         this.AddRemoteSubtitleInfo(oneName, item, searchInfo, scraper, list, true);
