@@ -503,20 +503,14 @@ public class LibraryManagerEventsHelper : IDisposable
             var queueUpdateMeta = new List<BaseItem>();
             // GetEpisodes一定要取所有fields，要不然更新会导致重建虚拟season季信息
             // TODO：可能出现未刮削完，就触发获取弹幕，导致GetEpisodes只能获取到部分剧集的情况
-            var episodes = season.GetEpisodes();
+            var episodes = this.GetExistingEpisodes(season);
             _logger.LogInformation("ProcessQueuedSeasonEvents episodes={count}", episodes.Count);
-            if (episodes == null)
+            if (episodes.Count == 0)
             {
                 continue;
             }
 
-            // 不处理季文件夹下的特典和extras影片（动画经常会混在一起）
-            var episodesWithoutSP = episodes.Where(x => x.ParentIndexNumber != null && x.ParentIndexNumber > 0).ToList();
-            if (episodes.Count != episodesWithoutSP.Count)
-            {
-                _logger.LogInformation("{0}季存在{1}个特典或extra片段，忽略处理.", season.Name, (episodes.Count - episodesWithoutSP.Count));
-                episodes = episodesWithoutSP;
-            }
+            
 
             foreach (var scraper in _scraperManager.All())
             {
@@ -872,7 +866,8 @@ public class LibraryManagerEventsHelper : IDisposable
                     return false;
                 }
 
-                if (this.Config.DownloadOption.EnableEpisodeCountSame && media.Episodes.Count != season.GetEpisodes().Count)
+                var episodes = this.GetExistingEpisodes(season);
+                        if (this.Config.DownloadOption.EnableEpisodeCountSame && media.Episodes.Count != season.GetEpisodes().Count)
                 {
                     this._logger.LogInformation("[{0}]刷新弹幕失败, 集数不一致。video: {1}.{2} 弹幕数：{3} 集数：{4}",scraper.Name, indexNumber, item.Name, media.Episodes.Count, season.GetEpisodes().Count);
                     return false;
@@ -938,6 +933,22 @@ public class LibraryManagerEventsHelper : IDisposable
         scraper = matchScraper;
     }
 
+    private List<BaseItem> GetExistingEpisodes(Season season)
+    {
+        var episodes = season.GetEpisodes()
+            .Where(i => !i.IsVirtualItem)
+            .ToList();
+        // 不处理季文件夹下的特典和extras影片（动画经常会混在一起）
+        var episodesWithoutSP = episodes
+            .Where(x => x.ParentIndexNumber != null && x.ParentIndexNumber > 0)
+            .ToList();
+        if (episodes.Count != episodesWithoutSP.Count)
+        {
+            _logger.LogInformation("{0}季存在{1}个特典或extra片段，忽略处理.", season.Name, (episodes.Count - episodesWithoutSP.Count));
+            episodes = episodesWithoutSP;
+        }
+        return episodes;
+    }
 
     // 调用UpdateToRepositoryAsync后，但未完成时，会导致GetEpisodes返回缺少正在处理的集数，所以采用统一最后处理
     private async Task ProcessQueuedUpdateMeta(List<BaseItem> queue)
