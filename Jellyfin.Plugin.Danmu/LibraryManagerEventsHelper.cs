@@ -388,12 +388,15 @@ public class LibraryManagerEventsHelper : IDisposable
         {
             try
             {
-                var mediaId = await scraper.SearchMediaId(currentItem);
+                var mediaId = await scraper.SearchMediaId(currentItem).ConfigureAwait(false);
                 if (string.IsNullOrEmpty(mediaId))
                 {
-                    this._logger.LogInformation("[{0}]匹配失败：{1} ({2})", scraper.Name, currentItem.Name, currentItem.ProductionYear);
-                    continue;
-                }
+                    this._logger.LogInformation("[{0}]元数据匹配失败：{1} ({2})，尝试文件匹配", scraper.Name, currentItem.Name, currentItem.ProductionYear);
+mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(false);
+                            if (string.IsNullOrEmpty(mediaId))
+                            {
+                            _logger.LogInformation("[{0}]文件匹配失败：{1}", scraper.Name, currentItem.Path);                    continue;
+                }}
 
                 var media = await scraper.GetMedia(currentItem, mediaId);
                 if (media != null)
