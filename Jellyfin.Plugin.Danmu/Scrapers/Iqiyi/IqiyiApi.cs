@@ -145,6 +145,7 @@ public class IqiyiApi : AbstractApi
         using (var request = new HttpRequestMessage(HttpMethod.Get, url))
         {
             request.Headers.Add("user-agent", MOBILE_USER_AGENT);
+            request.Headers.Add("sec-ch-ua-platform", "Android");
             var response = await this.httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
