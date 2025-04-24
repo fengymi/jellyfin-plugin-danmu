@@ -121,6 +121,13 @@ namespace Jellyfin.Plugin.Danmu.Controllers
                     return File(System.IO.File.ReadAllBytes(danmuPath), "text/xml");
                 }
             }
+            
+            var defaultDanmuPath = currentItem.GetDanmuXmlPath();
+            var defaultFileMeta = this._fileSystem.GetFileInfo(defaultDanmuPath);
+            if (defaultFileMeta.Exists)
+            {
+                return File(System.IO.File.ReadAllBytes(defaultDanmuPath), "text/xml");
+            }
 
             throw new ResourceNotFoundException();
         }
@@ -210,7 +217,7 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             foreach (Task<DanmuSourceDto?> danmuSourceTask in danmuSourceTasks)
             {
                 var danmuSourceDto = danmuSourceTask.GetAwaiter().GetResult();
-                if (danmuSourceDto != null && sites.Contains(danmuSourceDto.Source))
+                if (danmuSourceDto != null && (string.IsNullOrEmpty(danmuSourceDto.Source) || sites.Contains(danmuSourceDto.Source)))
                 {
                     danmuSources.Add(danmuSourceDto);
                 }
@@ -529,7 +536,6 @@ namespace Jellyfin.Plugin.Danmu.Controllers
             List<DanmuEventDTO> danmuEventDtos = new List<DanmuEventDTO>();
             foreach (XmlNode node in xmlNode.ChildNodes) //4.遍历根节点（根节点包含所有节点）
             {
-                // _logger.Info("XmlNode.InnerText={0}", node.InnerText);
                 if ("sourceprovider".Equals(node.Name))
                 {
                     danmuSourceDto.Source = node.InnerText;
