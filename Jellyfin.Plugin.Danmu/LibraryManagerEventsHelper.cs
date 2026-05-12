@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.Danmu.Configuration;
+using Jellyfin.Plugin.Danmu.Core;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using Jellyfin.Plugin.Danmu.Model;
 using Jellyfin.Plugin.Danmu.Scrapers;
@@ -16,7 +17,6 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -50,7 +50,7 @@ public class LibraryManagerEventsHelper : IDisposable
     /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
     /// <param name="loggerFactory">The <see cref="ILoggerFactory"/>.</param>
     /// <param name="api">The <see cref="BilibiliApi"/>.</param>
-    /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
+    /// <param name="fileSystem">Instance of the <see cref="MediaBrowser.Model.IO.IFileSystem"/> interface.</param>
     public LibraryManagerEventsHelper(IItemRepository itemRepository, ILibraryManager libraryManager, ILoggerFactory loggerFactory, Jellyfin.Plugin.Danmu.Core.IFileSystem fileSystem, ScraperManager scraperManager)
     {
         _queuedEvents = new List<LibraryEvent>();
@@ -77,12 +77,10 @@ public class LibraryManagerEventsHelper : IDisposable
                 throw new ArgumentNullException(nameof(libraryEvent.Item));
             }
 
-            var libraryEvent = new LibraryEvent { Item = item, EventType = eventType };
-            
             // 检查队列中是否已存在相同的事件
             if (_queuedEvents.Contains(libraryEvent))
             {
-                _logger.LogDebug("事件已在队列中,忽略重复添加: {ItemName} ({EventType})", item.Name, eventType);
+                _logger.LogDebug("事件已在队列中,忽略重复添加: {ItemName} ({EventType})", libraryEvent.Item.Name, libraryEvent.EventType);
                 return;
             }
 

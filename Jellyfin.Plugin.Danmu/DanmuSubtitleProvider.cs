@@ -142,7 +142,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             {
                 var result = await scraper.Search(item);
                 var subtitles = new List<RemoteSubtitleInfo>();
-                
+
                 foreach (var searchInfo in result)
                 {
                     var title = searchInfo.Name;
@@ -150,6 +150,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
                     {
                         title = $"[{searchInfo.Category}] {searchInfo.Name}";
                     }
+
                     if (searchInfo.Year != null && searchInfo.Year > 0)
                     {
                         title += $" ({searchInfo.Year})";
@@ -170,7 +171,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             {
                 _logger.LogError(ex, "[{0}]Exception handled processing queued movie events", scraper.Name);
             }
-        }
+        });
 
 
         return list;
