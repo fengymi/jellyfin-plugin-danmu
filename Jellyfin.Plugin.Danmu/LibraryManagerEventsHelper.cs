@@ -14,6 +14,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Caching.Memory;
@@ -26,8 +27,8 @@ public class LibraryManagerEventsHelper : IDisposable
     private readonly List<LibraryEvent> _queuedEvents;
     private readonly IMemoryCache _memoryCache;
     private readonly MemoryCacheEntryOptions _pendingAddExpiredOption = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30) };
-    private readonly MemoryCacheEntryOptions _danmuUpdatedExpiredOption = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(24*60) };
-
+    private readonly MemoryCacheEntryOptions _danmuUpdatedExpiredOption = new MemoryCacheEntryOptions() { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) };
+    private readonly IItemRepository _itemRepository;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<LibraryManagerEventsHelper> _logger;
     private readonly Jellyfin.Plugin.Danmu.Core.IFileSystem _fileSystem;
@@ -50,11 +51,12 @@ public class LibraryManagerEventsHelper : IDisposable
     /// <param name="loggerFactory">The <see cref="ILoggerFactory"/>.</param>
     /// <param name="api">The <see cref="BilibiliApi"/>.</param>
     /// <param name="fileSystem">Instance of the <see cref="IFileSystem"/> interface.</param>
-    public LibraryManagerEventsHelper(ILibraryManager libraryManager, ILoggerFactory loggerFactory, Jellyfin.Plugin.Danmu.Core.IFileSystem fileSystem, ScraperManager scraperManager)
+    public LibraryManagerEventsHelper(IItemRepository itemRepository, ILibraryManager libraryManager, ILoggerFactory loggerFactory, Jellyfin.Plugin.Danmu.Core.IFileSystem fileSystem, ScraperManager scraperManager)
     {
         _queuedEvents = new List<LibraryEvent>();
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
+        _itemRepository = itemRepository;
         _libraryManager = libraryManager;
         _logger = loggerFactory.CreateLogger<LibraryManagerEventsHelper>();
         _fileSystem = fileSystem;
@@ -73,6 +75,15 @@ public class LibraryManagerEventsHelper : IDisposable
             if (libraryEvent.Item == null)
             {
                 throw new ArgumentNullException(nameof(libraryEvent.Item));
+            }
+
+            var libraryEvent = new LibraryEvent { Item = item, EventType = eventType };
+            
+            // 检查队列中是否已存在相同的事件
+            if (_queuedEvents.Contains(libraryEvent))
+            {
+                _logger.LogDebug("事件已在队列中,忽略重复添加: {ItemName} ({EventType})", item.Name, eventType);
+                return;
             }
 
             if (_queueTimer == null)
@@ -249,7 +260,7 @@ public class LibraryManagerEventsHelper : IDisposable
         var libraryOptions = _libraryManager.GetLibraryOptions(item);
         if (libraryOptions != null && libraryOptions.DisabledSubtitleFetchers.Contains(Plugin.Instance?.Name))
         {
-            this._logger.LogInformation($"媒体库已关闭danmu插件, 忽略处理[{item.Name}].");
+            this._logger.LogDebug($"媒体库已关闭danmu插件, 忽略处理[{item.Name}].");
             return true;
         }
 
@@ -391,12 +402,9 @@ public class LibraryManagerEventsHelper : IDisposable
                 var mediaId = await scraper.SearchMediaId(currentItem).ConfigureAwait(false);
                 if (string.IsNullOrEmpty(mediaId))
                 {
-                    this._logger.LogInformation("[{0}]元数据匹配失败：{1} ({2})，尝试文件匹配", scraper.Name, currentItem.Name, currentItem.ProductionYear);
-mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(false);
-                            if (string.IsNullOrEmpty(mediaId))
-                            {
-                            _logger.LogInformation("[{0}]文件匹配失败：{1}", scraper.Name, currentItem.Path);                    continue;
-                }}
+                    this._logger.LogInformation("[{0}]元数据匹配失败：{1} ({2})", scraper.Name, currentItem.Name, currentItem.ProductionYear);
+                    continue;
+                }
 
                 var media = await scraper.GetMedia(currentItem, mediaId);
                 if (media != null)
@@ -568,7 +576,7 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
                         continue;
                     }
 
-                    foreach (var (episode, idx) in episodes.WithIndex())
+                    foreach (var (episode, idx) in episodes.AsEnumerable().Reverse().WithIndex())
                     {
                         var fileName = Path.GetFileName(episode.Path);
                         var indexNumber = episode.IndexNumber ?? 0;
@@ -601,15 +609,15 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
                             }
                         }
 
-                        var epId = media.Episodes[idx].Id;
-                        var commentId = media.Episodes[idx].CommentId;
+                        var epId = media.Episodes[indexNumber - 1].Id;
+                        var commentId = media.Episodes[indexNumber - 1].CommentId;
                         _logger.LogInformation("[{0}]成功匹配. {1}.{2} -> epId: {3} cid: {4}", scraper.Name, indexNumber, episode.Name, epId, commentId);
 
                         // 更新eposide元数据
-                        var episodeProviderVal = episode.GetProviderId(scraper.ProviderId);
+                        var episodeProviderVal = DanmuProviderId.Get(episode,scraper.ProviderId);
                         if (!string.IsNullOrEmpty(epId) && episodeProviderVal != epId)
                         {
-                            episode.SetProviderId(scraper.ProviderId, epId);
+                            DanmuProviderId.Set(episode, _scraperManager.All(),scraper.ProviderId, epId);
                             queueUpdateMeta.Add(episode);
                         }
                         
@@ -882,10 +890,10 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
                 this._logger.LogInformation("[{0}]成功匹配. {1}.{2} -> epId: {3} cid: {4}", scraper.Name, item.IndexNumber, item.Name, epId, commentId);
 
                 // 更新 eposide 元数据
-                var episodeProviderVal = item.GetProviderId(scraper.ProviderId);
+                var episodeProviderVal = DanmuProviderId.Get(item,scraper.ProviderId);
                 if (!string.IsNullOrEmpty(epId) && episodeProviderVal != epId)
                 {
-                    item.SetProviderId(scraper.ProviderId, epId);
+                    DanmuProviderId.Set(item, _scraperManager.All(),scraper.ProviderId, epId);
                     queueUpdateMeta.Add(item);
                 }
 
@@ -967,18 +975,22 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
             var item = _libraryManager.GetItemById(queueItem.Id);
             if (item != null)
             {
-                // 合并新添加的provider id
-                foreach (var pair in queueItem.ProviderIds)
-                {
-                    if (string.IsNullOrEmpty(pair.Value))
-                    {
-                        continue;
-                    }
+                var providerIdSnapshot = queueItem.ProviderIds
+                    .Where(pair => !string.IsNullOrEmpty(pair.Value))
+                    .ToDictionary(pair => pair.Key, pair => pair.Value);
 
+                if (providerIdSnapshot.ContainsKey(DanmuProviderId.UnifiedProviderId))
+                {
+                    DanmuProviderId.Clear(item, _scraperManager.All());
+                }
+
+                // 合并新添加的provider id
+                foreach (var pair in providerIdSnapshot)
+                {
                     item.ProviderIds[pair.Key] = pair.Value;
                 }
 
-                await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+                await this.UpdateItemsAsync(item, CancellationToken.None).ConfigureAwait(false);
                 // _logger.LogInformation("更新epid到元数据, type={type} item={name}, id={id}, ProviderIds={ProviderIds}", item.GetType(), item.Name, item.Id, item.ProviderIds);
             }
         }
@@ -991,10 +1003,10 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
         var checkDownloadedKey = $"{item.Id}_{commentId}";
         try
         {
-            // 弹幕24小时内更新过，忽略处理（有时Update事件会重复执行）
+            // 弹幕5分钟内更新过，忽略处理（有时Update事件会重复执行）
             if (!ignoreCheck && _memoryCache.TryGetValue(checkDownloadedKey, out var latestDownloaded))
             {
-                _logger.LogInformation("[{0}]最近24小时已更新过弹幕xml，忽略处理：{1}.{2}", scraper.Name, item.IndexNumber, item.Name);
+                _logger.LogInformation("[{0}]最近5分钟已更新过弹幕xml，忽略处理：{1}.{2}", scraper.Name, item.IndexNumber, item.Name);
                 return;
             }
 
@@ -1002,10 +1014,17 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
             var danmaku = await scraper.GetDanmuContent(item, commentId);
             if (danmaku != null)
             {
-                var bytes = danmaku.ToXml();
-                if (bytes.Length < 1024)
+                if (danmaku.Items.Count <= 0)
                 {
-                    _logger.LogInformation("[{0}]弹幕内容少于1KB，忽略处理：{1}.{2}", scraper.Name, item.IndexNumber, item.Name);
+                    _logger.LogInformation("[{0}]弹幕内容为空，忽略处理：{1}.{2}", scraper.Name, item.IndexNumber, item.Name);
+                    return;
+                }
+
+                // 为了避免bilibili下架视频后，返回的失效弹幕内容把旧弹幕覆盖掉，这里做个内容判断
+                var bytes = danmaku.ToXml();
+                if (bytes.Length < 1024 && scraper.ProviderName == Jellyfin.Plugin.Danmu.Scrapers.Bilibili.Bilibili.ScraperProviderName)
+                {
+                    _logger.LogInformation("[{0}]弹幕内容少于1KB，可能是已失效弹幕，忽略处理：{1}.{2}", scraper.Name, item.IndexNumber, item.Name);
                     return;
                 }
                 await this.SaveDanmu(scraper, item, bytes);
@@ -1086,15 +1105,30 @@ mediaId = await scraper.SearchMediaIdByFile((Movie)currentItem).ConfigureAwait(f
 
     private async Task ForceSaveProviderId(BaseItem item, string providerId, string providerVal)
     {
-        // 先清空旧弹幕的所有元数据
-        foreach (var s in _scraperManager.All())
-        {
-            item.ProviderIds.Remove(s.ProviderId);
-        }
-        // 保存指定弹幕元数据
-        item.ProviderIds[providerId] = providerVal;
+        DanmuProviderId.Set(item, _scraperManager.All(), providerId, providerVal);
 
-        await item.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+        await this.UpdateItemsAsync(item, CancellationToken.None).ConfigureAwait(false);
+    }
+    
+    private async Task UpdateItemsAsync(BaseItem item, CancellationToken cancellationToken)
+    {
+        this.UpdateItemsAsync([item], cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task UpdateItemsAsync(IReadOnlyList<BaseItem> items, CancellationToken cancellationToken)
+    {
+        // 不直接使用 item.UpdateToRepositoryAsync 保存，是因为该方法内部会触发 LibraryMonitor 事件，导致重复处理
+        // https://github.com/jellyfin/jellyfin/blob/59d574edb7aca3a7a6ffdd139cc56111d7804ffc/Emby.Server.Implementations/Library/LibraryManager.cs#L2152
+        foreach (var item in items)
+        {
+            item.DateLastSaved = DateTime.UtcNow;
+            // 触发nfo等元数据保存
+            await this._libraryManager.RunMetadataSavers(item, ItemUpdateType.MetadataEdit).ConfigureAwait(false);
+
+            // Modify again, so saved value is after write time of externally saved metadata
+            item.DateLastSaved = DateTime.UtcNow;
+        }
+        this._itemRepository.SaveItems(items, cancellationToken);
     }
 
 

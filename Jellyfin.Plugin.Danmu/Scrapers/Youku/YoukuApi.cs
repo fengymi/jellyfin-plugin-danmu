@@ -26,6 +26,10 @@ public class YoukuApi : AbstractApi
 
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
     private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
+    private TimeLimiter _delayShortExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(10));
+
+    // 并行请求配置
+    private const int DefaultParallelCount = 3;
 
     protected string _cna = string.Empty;
     protected string _token = string.Empty;
@@ -60,7 +64,7 @@ public class YoukuApi : AbstractApi
         keyword = HttpUtility.UrlEncode(keyword);
         var ua = HttpUtility.UrlEncode(AbstractApi.HTTP_USER_AGENT);
         var url = $"https://search.youku.com/api/search?keyword={keyword}&userAgent={ua}&site=1&categories=0&ftype=0&ob=0&pg=1";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = new List<YoukuVideo>();
@@ -166,7 +170,7 @@ public class YoukuApi : AbstractApi
         // 获取影片信息：https://openapi.youku.com/v2/shows/show.json?client_id=53e6cc67237fc59a&package=com.huawei.hwvplayer.youku&show_id=0b39c5b6569311e5b2ad
         // 获取影片剧集信息：https://openapi.youku.com/v2/shows/videos.json?client_id=53e6cc67237fc59a&package=com.huawei.hwvplayer.youku&ext=show&show_id=deea7e54c2594c489bfd
         var url = $"https://openapi.youku.com/v2/shows/videos.json?client_id=53e6cc67237fc59a&package=com.huawei.hwvplayer.youku&ext=show&show_id={id}&page={page}&count={pageSize}";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<YoukuVideo>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
@@ -212,7 +216,7 @@ public class YoukuApi : AbstractApi
 
         // 文档：https://cloud.youku.com/docs?id=46
         var url = $"https://openapi.youku.com/v2/videos/show_basic.json?client_id=53e6cc67237fc59a&package=com.huawei.hwvplayer.youku&video_id={vid}";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<YoukuEpisode>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
@@ -226,7 +230,12 @@ public class YoukuApi : AbstractApi
         return null;
     }
 
-    public async Task<List<YoukuComment>> GetDanmuContentAsync(string vid, CancellationToken cancellationToken)
+    public async Task<List<YoukuComment>> GetDanmuContentAsync(string vid, CancellationToken cancellationToken, bool isParallel = false)
+    {
+        return await this.GetDanmuContentAsync(vid, isParallel, DefaultParallelCount, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<List<YoukuComment>> GetDanmuContentAsync(string vid, bool isParallel, int parallelCount, CancellationToken cancellationToken)
     {
         var danmuList = new List<YoukuComment>();
         if (string.IsNullOrEmpty(vid))
@@ -234,8 +243,12 @@ public class YoukuApi : AbstractApi
             return danmuList;
         }
 
-        await this.EnsureTokenCookie(cancellationToken);
+        if (parallelCount <= 0)
+        {
+            parallelCount = DefaultParallelCount;
+        }
 
+        await this.EnsureTokenCookie(cancellationToken);
 
         var episode = await this.GetEpisodeAsync(vid, cancellationToken);
         if (episode == null)
@@ -244,13 +257,51 @@ public class YoukuApi : AbstractApi
         }
 
         var totalMat = episode.TotalMat;
-        for (int mat = 0; mat < totalMat; mat++)
-        {
-            var comments = await this.GetDanmuContentByMatAsync(vid, mat, cancellationToken);
-            danmuList.AddRange(comments);
 
-            // 等待一段时间避免api请求太快
-            await this._delayExecuteConstraint;
+        if (isParallel)
+        {
+            // 并行执行
+            var tasks = new List<Task<List<YoukuComment>>>();
+            var semaphore = new SemaphoreSlim(parallelCount, parallelCount);
+
+            for (int mat = 0; mat < totalMat; mat++)
+            {
+                var currentMat = mat;
+                await semaphore.WaitAsync(cancellationToken);
+
+                var task = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await this._delayShortExecuteConstraint;
+                        return await this.GetDanmuContentByMatAsync(vid, currentMat, cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }, cancellationToken);
+
+                tasks.Add(task);
+            }
+
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            foreach (var comments in results)
+            {
+                danmuList.AddRange(comments);
+            }
+        }
+        else
+        {
+            // 串行执行
+            for (int mat = 0; mat < totalMat; mat++)
+            {
+                var comments = await this.GetDanmuContentByMatAsync(vid, mat, cancellationToken);
+                danmuList.AddRange(comments);
+
+                // 等待一段时间避免api请求太快
+                await this._delayShortExecuteConstraint;
+            }
         }
 
         return danmuList;
@@ -346,7 +397,7 @@ public class YoukuApi : AbstractApi
         if (cookie == null)
         {
             var url = "https://log.mmstat.com/eg.js";
-            var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             // 重新读取最新
@@ -365,7 +416,7 @@ public class YoukuApi : AbstractApi
         if (tokenCookie == null || tokenEncCookie == null)
         {
             var url = "https://acs.youku.com/h5/mtop.com.youku.aplatform.weakget/1.0/?jsv=2.5.1&appKey=24679788";
-            var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             // 重新读取最新

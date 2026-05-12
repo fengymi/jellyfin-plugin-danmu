@@ -33,6 +33,8 @@ public class Tencent : AbstractScraper
 
     public override string ProviderId => ScraperProviderId;
 
+    public override uint HashPrefix => 14;
+
     public override async Task<List<ScraperSearchInfo>> Search(BaseItem item)
     {
         var list = new List<ScraperSearchInfo>();
@@ -174,12 +176,64 @@ public class Tencent : AbstractScraper
 
     public override async Task<ScraperDanmaku?> GetDanmuContent(BaseItem item, string commentId)
     {
+        return await this.GetDanmuContentInternal(commentId).ConfigureAwait(false);
+    }
+
+    public override async Task<List<ScraperSearchInfo>> SearchForApi(string keyword)
+    {
+        var list = new List<ScraperSearchInfo>();
+        var videos = await this._api.SearchAsync(keyword, CancellationToken.None).ConfigureAwait(false);
+        foreach (var video in videos)
+        {
+            var videoId = video.Id;
+            var title = video.Title;
+            var pubYear = video.Year;
+            var episodeSize = video.SubjectDoc.VideoNum;
+            list.Add(new ScraperSearchInfo()
+            {
+                Id = $"{videoId}",
+                Name = title,
+                Category = video.TypeName,
+                Year = pubYear,
+                EpisodeSize = episodeSize,
+            });
+        }
+        return list;
+    }
+
+    public override async Task<List<ScraperEpisode>> GetEpisodesForApi(string id)
+    {
+        var list = new List<ScraperEpisode>();
+        var video = await this._api.GetVideoAsync(id, CancellationToken.None).ConfigureAwait(false);
+        if (video == null)
+        {
+            return list;
+        }
+
+        if (video.EpisodeList != null && video.EpisodeList.Count > 0)
+        {
+            foreach (var ep in video.EpisodeList)
+            {
+                list.Add(new ScraperEpisode() { Id = $"{ep.Vid}", CommentId = $"{ep.Vid}", Title = ep.Title });
+            }
+        }
+
+        return list;
+    }
+
+    public override async Task<ScraperDanmaku?> DownloadDanmuForApi(string commentId)
+    {
+        return await this.GetDanmuContentInternal(commentId, true).ConfigureAwait(false);
+    }
+
+    private async Task<ScraperDanmaku?> GetDanmuContentInternal(string commentId, bool isParallel = false)
+    {
         if (string.IsNullOrEmpty(commentId))
         {
             return null;
         }
 
-        var comments = await _api.GetDanmuContentAsync(commentId, CancellationToken.None).ConfigureAwait(false);
+        var comments = await _api.GetDanmuContentAsync(commentId, CancellationToken.None, isParallel).ConfigureAwait(false);
         var danmaku = new ScraperDanmaku();
         danmaku.ChatId = 1000;
         danmaku.ChatServer = "dm.video.qq.com";
@@ -227,53 +281,6 @@ public class Tencent : AbstractScraper
         }
 
         return danmaku;
-    }
-
-    public override async Task<List<ScraperSearchInfo>> SearchForApi(string keyword)
-    {
-        var list = new List<ScraperSearchInfo>();
-        var videos = await this._api.SearchAsync(keyword, CancellationToken.None).ConfigureAwait(false);
-        foreach (var video in videos)
-        {
-            var videoId = video.Id;
-            var title = video.Title;
-            var pubYear = video.Year;
-            var episodeSize = video.SubjectDoc.VideoNum;
-            list.Add(new ScraperSearchInfo()
-            {
-                Id = $"{videoId}",
-                Name = title,
-                Category = video.TypeName,
-                Year = pubYear,
-                EpisodeSize = episodeSize,
-            });
-        }
-        return list;
-    }
-
-    public override async Task<List<ScraperEpisode>> GetEpisodesForApi(string id)
-    {
-        var list = new List<ScraperEpisode>();
-        var video = await this._api.GetVideoAsync(id, CancellationToken.None).ConfigureAwait(false);
-        if (video == null)
-        {
-            return list;
-        }
-
-        if (video.EpisodeList != null && video.EpisodeList.Count > 0)
-        {
-            foreach (var ep in video.EpisodeList)
-            {
-                list.Add(new ScraperEpisode() { Id = $"{ep.Vid}", CommentId = $"{ep.Vid}", Title = ep.Title });
-            }
-        }
-
-        return list;
-    }
-
-    public override async Task<ScraperDanmaku?> DownloadDanmuForApi(string commentId)
-    {
-        return await this.GetDanmuContent(null, commentId).ConfigureAwait(false);
     }
 
 }

@@ -35,6 +35,8 @@ public class Youku : AbstractScraper
 
     public override string ProviderId => ScraperProviderId;
 
+    public override uint HashPrefix => 12;
+
     public override async Task<List<ScraperSearchInfo>> Search(BaseItem item)
     {
         var list = new List<ScraperSearchInfo>();
@@ -173,45 +175,8 @@ public class Youku : AbstractScraper
 
     public override async Task<ScraperDanmaku?> GetDanmuContent(BaseItem item, string commentId)
     {
-        if (string.IsNullOrEmpty(commentId))
-        {
-            return null;
-        }
-
-        var comments = await _api.GetDanmuContentAsync(commentId, CancellationToken.None).ConfigureAwait(false);
-        var danmaku = new ScraperDanmaku();
-        danmaku.ChatId = 1000;
-        danmaku.ChatServer = "acs.youku.com";
-        danmaku.ProviderId = this.ProviderId;
-        foreach (var comment in comments)
-        {
-            try
-            {
-                var danmakuText = new ScraperDanmakuText();
-                danmakuText.Progress = (int)comment.Playat;
-                danmakuText.Mode = 1;
-                danmakuText.MidHash = $"[youku]{comment.Uid}";
-                danmakuText.Id = comment.ID;
-                danmakuText.Content = comment.Content;
-
-                var property = JsonSerializer.Deserialize<YoukuCommentProperty>(comment.Propertis);
-                if (property != null)
-                {
-                    danmakuText.Color = property.Color;
-                }
-
-                danmaku.Items.Add(danmakuText);
-            }
-            catch (Exception ex)
-            {
-
-            }
-
-        }
-
-        return danmaku;
+        return await this.GetDanmuContentInternal(commentId, false).ConfigureAwait(false);
     }
-
 
     public override async Task<List<ScraperSearchInfo>> SearchForApi(string keyword)
     {
@@ -222,12 +187,6 @@ public class Youku : AbstractScraper
             var videoId = video.ID;
             var title = video.Title;
             var pubYear = video.Year;
-
-            var score = keyword.Distance(title);
-            if (score <= 0)
-            {
-                continue;
-            }
 
             list.Add(new ScraperSearchInfo()
             {
@@ -263,7 +222,48 @@ public class Youku : AbstractScraper
 
     public override async Task<ScraperDanmaku?> DownloadDanmuForApi(string commentId)
     {
-        return await this.GetDanmuContent(null, commentId).ConfigureAwait(false);
+        return await this.GetDanmuContentInternal(commentId, true).ConfigureAwait(false);
+    }
+
+    private async Task<ScraperDanmaku?> GetDanmuContentInternal(string commentId, bool isParallel)
+    {
+        if (string.IsNullOrEmpty(commentId))
+        {
+            return null;
+        }
+
+        var comments = await _api.GetDanmuContentAsync(commentId, CancellationToken.None).ConfigureAwait(false);
+        var danmaku = new ScraperDanmaku();
+        danmaku.ChatId = 1000;
+        danmaku.ChatServer = "acs.youku.com";
+        danmaku.ProviderId = this.ProviderId;
+        foreach (var comment in comments)
+        {
+            try
+            {
+                var danmakuText = new ScraperDanmakuText();
+                danmakuText.Progress = (int)comment.Playat;
+                danmakuText.Mode = 1;
+                danmakuText.MidHash = $"[youku]{comment.Uid}";
+                danmakuText.Id = comment.ID;
+                danmakuText.Content = comment.Content;
+
+                var property = JsonSerializer.Deserialize<YoukuCommentProperty>(comment.Propertis);
+                if (property != null)
+                {
+                    danmakuText.Color = property.Color;
+                }
+
+                danmaku.Items.Add(danmakuText);
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Failed to parse comment: {CommentId}", comment.ID);
+            }
+
+        }
+
+        return danmaku;
     }
 
 }

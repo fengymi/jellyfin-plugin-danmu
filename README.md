@@ -1,16 +1,17 @@
 # jellyfin-plugin-danmu
 
 [![releases](https://img.shields.io/github/v/release/cxfksword/jellyfin-plugin-danmu)](https://github.com/cxfksword/jellyfin-plugin-danmu/releases)
-[![jellyfin](https://img.shields.io/badge/jellyfin-10.9.x|10.10.x-lightgrey?logo=jellyfin)](https://github.com/cxfksword/jellyfin-plugin-danmu/releases)
+[![jellyfin](https://img.shields.io/badge/jellyfin-10.11.x-lightgrey?logo=jellyfin)](https://github.com/cxfksword/jellyfin-plugin-danmu/releases)
 [![LICENSE](https://img.shields.io/github/license/cxfksword/jellyfin-plugin-danmu)](https://github.com/cxfksword/jellyfin-plugin-danmu/main/LICENSE) 
 
-jellyfin弹幕自动下载插件，已支持的弹幕来源：b站，弹弹play，优酷，爱奇艺，腾讯视频，芒果TV。
+jellyfin弹幕自动下载插件，已支持的弹幕来源：b站，~~弹弹play~~，优酷，爱奇艺，腾讯视频，芒果TV。
 
 支持功能：
 
 * 自动下载xml格式弹幕
 * 生成ass格式弹幕
 * 支持api访问弹幕
+* 兼容弹弹play接口规范访问
 
 ![logo](doc/logo.png)
 
@@ -42,18 +43,21 @@ jellyfin弹幕自动下载插件，已支持的弹幕来源：b站，弹弹play�
 
 ## 支持的api接口
 
-* `/api/danmu/{id}`:  获取影片或剧集的xml弹幕链接，不存在时，url为空
-* `/api/danmu/{id}/raw`:  获取影片或剧集的xml弹幕文件内容
-
+* `/api/danmu/{id}`:  获取jellyfin电影或剧集的xml弹幕链接，不存在时，url为空
+* `/api/danmu/{id}/raw`:  获取jellyfin电影或剧集的xml弹幕文件内容
+* `/api/v2/search/anime?keyword=xxx`: 根据关键字搜索影视
+* `/api/v2/search/episodes?anime=xxx`: 根据关键字搜索影视的剧集信息
+* `/api/v2/bangumi/{bangumiId}`: 获取影视详细信息
+* `/api/v2/comment/{episodeId}?format=xml`: 获取弹幕内容，默认json格式
 
 ## 如何播放
 
 xml格式：
 
 * [switchfin](https://github.com/dragonflylee/switchfin) (Windows/Mac/Linux) 🌟
+* [Senplayer](https://apps.apple.com/us/app/senplayer-video-media-player/id6443975850) (iOS/iPadOS/AppleTV) 🌟
 * [弹弹play](https://www.dandanplay.com/) (Windows/Mac/Android)
 * [KikoPlay](https://github.com/KikoPlayProject/KikoPlay) (Windows/Mac)
-* [Fileball](https://fileball.app/) (iOS/iPadOS/AppleTV)
 
 
 ass格式：
@@ -63,13 +67,11 @@ ass格式：
 * Infuse (Mac/iOS/iPadOS/AppleTV)
 
 
-
-
 ## How to build
 
 1. Clone or download this repository
 
-2. Ensure you have .NET Core SDK 8.0 setup and installed
+2. Ensure you have .NET Core SDK 9.0 setup and installed
 
 3. Build plugin with following command.
 
@@ -83,7 +85,7 @@ dotnet publish --configuration=Release Jellyfin.Plugin.Danmu/Jellyfin.Plugin.Dan
 
 1. Build the plugin
 
-2. Create a folder, like `danmu` and copy  `./Jellyfin.Plugin.Danmu/bin/Release/net8.0/Jellyfin.Plugin.Danmu.dll` into it
+2. Create a folder, like `danmu` and copy  `./Jellyfin.Plugin.Danmu/bin/Release/net9.0/Jellyfin.Plugin.Danmu.dll` into it
 
 3. Move folder `danmu` to jellyfin `data/plugins` folder
 

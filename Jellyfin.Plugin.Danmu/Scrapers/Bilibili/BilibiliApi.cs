@@ -21,7 +21,8 @@ public class BilibiliApi : AbstractApi
 {
     private static readonly object _lock = new object();
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
-    private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
+    private TimeLimiter _limitDownloadRequestConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromSeconds(10));
+    private TimeLimiter _delayShortExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(10));
 
     private static readonly Regex regBiliplusVideoInfo = new Regex(@"view\((.+?)\);", RegexOptions.Compiled);
 
@@ -58,7 +59,7 @@ public class BilibiliApi : AbstractApi
         // 搜索影视
         var result = new SearchResult();
         var url = $"https://api.bilibili.com/x/web-interface/search/type?keyword={keyword}&search_type=media_ft";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var ftResult = await response.Content.ReadFromJsonAsync<ApiResult<SearchResult>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
         if (ftResult != null && ftResult.Code == 0 && ftResult.Data != null)
@@ -68,9 +69,9 @@ public class BilibiliApi : AbstractApi
 
         // 搜索番剧
         url = $"https://api.bilibili.com/x/web-interface/search/type?keyword={keyword}&search_type=media_bangumi";
-        response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        var bangumiResult = await response.Content.ReadFromJsonAsync<ApiResult<SearchResult>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
+        using var bangumiResponse = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        bangumiResponse.EnsureSuccessStatusCode();
+        var bangumiResult = await bangumiResponse.Content.ReadFromJsonAsync<ApiResult<SearchResult>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
         if (bangumiResult != null && bangumiResult.Code == 0 && bangumiResult.Data != null && bangumiResult.Data.Result != null)
         {
             if (result.Result == null)
@@ -105,7 +106,7 @@ public class BilibiliApi : AbstractApi
         // https://api.bilibili.com/x/v1/dm/list.so?oid={cid}
         bvid = bvid.Trim();
         var pageUrl = $"http://api.bilibili.com/x/player/pagelist?bvid={bvid}";
-        var response = await this.httpClient.GetAsync(pageUrl, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(pageUrl, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ApiResult<VideoPart[]>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Code == 0 && result.Data != null)
@@ -150,8 +151,10 @@ public class BilibiliApi : AbstractApi
             throw new ArgumentNullException(nameof(cid));
         }
 
+        await this._limitDownloadRequestConstraint;
+
         var url = $"https://api.bilibili.com/x/v1/dm/list.so?oid={cid}";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             throw new Exception($"Request fail. url={url} status_code={response.StatusCode}");
@@ -188,7 +191,7 @@ public class BilibiliApi : AbstractApi
 
         // var url = $"http://api.bilibili.com/pgc/view/web/season?season_id={seasonId}";
         var url = $"https://api.bilibili.com/pgc/view/web/ep/list?season_id={seasonId}";  // 接口依赖 referer 过滤正片选集
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ApiResult<VideoSeason>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Code == 0 && result.Result != null)
@@ -221,7 +224,7 @@ public class BilibiliApi : AbstractApi
         await this.EnsureSessionCookie(cancellationToken).ConfigureAwait(false);
 
         var url = $"https://api.bilibili.com/pgc/view/web/ep/list?ep_id={epId}";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<ApiResult<VideoSeason>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Code == 0 && result.Result != null && result.Result.Episodes != null)
@@ -258,7 +261,7 @@ public class BilibiliApi : AbstractApi
         await this.EnsureSessionCookie(cancellationToken).ConfigureAwait(false);
 
         var url = $"https://api.bilibili.com/x/web-interface/view?bvid={bvid}";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<ApiResult<Video>>(this._jsonOptions, cancellationToken).ConfigureAwait(false);
@@ -289,7 +292,7 @@ public class BilibiliApi : AbstractApi
         }
 
         var url = $"https://www.biliplus.com/video/{avid}/";
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -320,6 +323,8 @@ public class BilibiliApi : AbstractApi
         danmaku.ProviderId = Bilibili.ScraperProviderId;
         danmaku.Items = new List<ScraperDanmakuText>();
 
+        await this._limitDownloadRequestConstraint;
+
         await this.EnsureSessionCookie(cancellationToken).ConfigureAwait(false);
 
         try
@@ -328,7 +333,7 @@ public class BilibiliApi : AbstractApi
             while (true)
             {
                 var url = $"https://api.bilibili.com/x/v2/dm/web/seg.so?type=1&oid={cid}&pid={aid}&segment_index={segmentIndex}";
-                var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+                using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
                 {
                     // 已经到最后了
@@ -378,7 +383,7 @@ public class BilibiliApi : AbstractApi
                 segmentIndex += 1;
 
                 // 等待一段时间避免api请求太快
-                await this._delayExecuteConstraint;
+                await this._delayShortExecuteConstraint;
             }
         }
         catch (Exception ex)
@@ -399,7 +404,7 @@ public class BilibiliApi : AbstractApi
             return;
         }
 
-        var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
 

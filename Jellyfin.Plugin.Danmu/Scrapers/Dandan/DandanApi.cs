@@ -15,6 +15,8 @@ using Jellyfin.Plugin.Danmu.Configuration;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
 using MediaBrowser.Controller.Entities;
 using System.IO;
+using RateLimiter;
+using ComposableAsync;
 
 namespace Jellyfin.Plugin.Danmu.Scrapers.Dandan;
 
@@ -22,6 +24,8 @@ public class DandanApi : AbstractApi
 {
     const string API_ID = "";
     const string API_SECRET = "";
+    private TimeLimiter _limitRequestConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
+    private TimeLimiter _downloadLimitConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromSeconds(10));
     private static readonly object _lock = new object();
     private DateTime lastRequestTime = DateTime.Now.AddDays(-1);
 
@@ -33,7 +37,7 @@ public class DandanApi : AbstractApi
         }
     }
 
-    protected string ApiID
+    public string ApiID
     {
         get
         {
@@ -47,7 +51,7 @@ public class DandanApi : AbstractApi
         }
     }
 
-    protected string ApiSecret
+    public string ApiSecret
     {
         get
         {
@@ -69,6 +73,7 @@ public class DandanApi : AbstractApi
         : base(loggerFactory.CreateLogger<DandanApi>())
     {
         httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+        httpClient.Timeout = TimeSpan.FromSeconds(10);
     }
 
 
@@ -90,7 +95,7 @@ public class DandanApi : AbstractApi
 
         keyword = HttpUtility.UrlEncode(keyword);
         var url = $"https://api.dandanplay.net/api/v2/search/anime?keyword={keyword}";
-        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<SearchResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Success)
         {
@@ -131,7 +136,7 @@ public class DandanApi : AbstractApi
         }
 
         var url = "https://api.dandanplay.net/api/v2/match";
-        var response = await this.Request(url, HttpMethod.Post, matchRequest, cancellationToken).ConfigureAwait(false);
+        using var response = await this.Request(url, HttpMethod.Post, matchRequest, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<MatchResponseV2>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Success && result.Matches != null)
         {
@@ -189,7 +194,7 @@ public class DandanApi : AbstractApi
         }
 
         var url = $"https://api.dandanplay.net/api/v2/bangumi/{animeId}";
-        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync<AnimeResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null && result.Success && result.Bangumi != null)
@@ -219,12 +224,12 @@ public class DandanApi : AbstractApi
             throw new ArgumentNullException(nameof(epId));
         }
 
-        this.LimitRequestFrequently();
+        await this._downloadLimitConstraint;
 
         var withRelated = this.Config.WithRelatedDanmu ? "true" : "false";
         var chConvert = this.Config.ChConvert;
         var url = $"https://api.dandanplay.net/api/v2/comment/{epId}?withRelated={withRelated}&chConvert={chConvert}";
-        var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
+        using var response = await this.Request(url, cancellationToken).ConfigureAwait(false);
         var result = await response.Content.ReadFromJsonAsync<CommentResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
         if (result != null)
         {
@@ -234,21 +239,9 @@ public class DandanApi : AbstractApi
         throw new Exception($"Request fail. epId={epId}");
     }
 
-    protected void LimitRequestFrequently(double intervalMilliseconds = 1000)
+    protected async Task LimitRequestFrequently(double intervalMilliseconds = 1000)
     {
-        var diff = 0;
-        lock (_lock)
-        {
-            var ts = DateTime.Now - lastRequestTime;
-            diff = (int)(intervalMilliseconds - ts.TotalMilliseconds);
-            lastRequestTime = DateTime.Now;
-        }
-
-        if (diff > 0)
-        {
-            this._logger.LogDebug("请求太频繁，等待{0}毫秒后继续执行...", diff);
-            Thread.Sleep(diff);
-        }
+        await this._limitRequestConstraint;
     }
 
     protected async Task<HttpResponseMessage> Request(string url, CancellationToken cancellationToken)

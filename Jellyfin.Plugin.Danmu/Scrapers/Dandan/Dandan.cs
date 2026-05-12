@@ -33,6 +33,10 @@ public class Dandan : AbstractScraper
 
     public override string ProviderId => ScraperProviderId;
 
+    public override uint HashPrefix => 11;
+
+    public override bool IsDeprecated => string.IsNullOrEmpty(this._api.ApiID) || string.IsNullOrEmpty(this._api.ApiSecret);
+
     public override async Task<List<ScraperSearchInfo>> Search(BaseItem item)
     {
         var list = new List<ScraperSearchInfo>();

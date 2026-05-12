@@ -18,6 +18,7 @@ public class MgtvApi : AbstractApi
 {
     private TimeLimiter _timeConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(1000));
     private TimeLimiter _delayExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(100));
+    private TimeLimiter _delayShortExecuteConstraint = TimeLimiter.GetFromMaxCountByInterval(1, TimeSpan.FromMilliseconds(10));
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MgtvApi"/> class.
@@ -48,7 +49,7 @@ public class MgtvApi : AbstractApi
 
         keyword = HttpUtility.UrlEncode(keyword);
         var url = $"https://mobileso.bz.mgtv.com/msite/search/v2?q={keyword}&pc=30&pn=1&sort=-99&ty=0&du=0&pt=0&corr=1&abroad=0&_support=10000000000000000";
-        var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = new List<MgtvSearchItem>();
@@ -99,7 +100,7 @@ public class MgtvApi : AbstractApi
         do
         {
             var url = $"https://pcweb.api.mgtv.com/variety/showlist?allowedRC=1&collection_id={id}&month={month}&page=1&_support=10000000";
-            var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var response = await httpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<MgtvEpisodeListResult>(_jsonOptions, cancellationToken).ConfigureAwait(false);
@@ -171,7 +172,7 @@ public class MgtvApi : AbstractApi
 
                         time++;
                         // 等待一段时间避免api请求太快
-                        await _delayExecuteConstraint;
+                        await _delayShortExecuteConstraint;
                     }
                     catch (Exception ex)
                     {
@@ -218,7 +219,7 @@ public class MgtvApi : AbstractApi
 
             time = segmentResult?.Data?.Next ?? 0;
             // 等待一段时间避免api请求太快
-            await _delayExecuteConstraint;
+            await _delayShortExecuteConstraint;
         }
         while (time > 0);
     

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Danmu.Core;
 using MediaBrowser.Controller.Entities;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Danmu.Scrapers.Entity;
@@ -31,6 +32,8 @@ public class Mgtv : AbstractScraper
     public override string ProviderName => ScraperProviderName;
 
     public override string ProviderId => ScraperProviderId;
+
+    public override uint HashPrefix => 15;
 
 
     private static readonly Regex regTvEpisodeTitle = new Regex(@"^第.+?集$", RegexOptions.Compiled);
@@ -174,7 +177,7 @@ public class Mgtv : AbstractScraper
         // 从季信息元数据中，获取cid值
         // 不能通过GetParent获取Season，因为没有SXX季文件夹时，GetParent是Series
         var season = ((MediaBrowser.Controller.Entities.TV.Episode)item).Season;
-        season.ProviderIds.TryGetValue(ScraperProviderId, out var cid);
+        DanmuProviderId.TryGet(season, ScraperProviderId, out var cid);
         return new ScraperEpisode() { Id = id, CommentId = $"{cid},{id}" };
     }
 
