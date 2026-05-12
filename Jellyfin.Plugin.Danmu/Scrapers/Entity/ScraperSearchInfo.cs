@@ -9,6 +9,8 @@ public class ScraperSearchInfo
     public string Category { get; set; } = string.Empty;
     public int? Year { get; set; }
     public int EpisodeSize { get; set; }
+    
+    public string Source { get; set; }
 
     public string StartDate {
         get

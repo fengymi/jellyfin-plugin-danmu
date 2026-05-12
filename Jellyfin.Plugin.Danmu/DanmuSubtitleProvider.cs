@@ -232,7 +232,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             Name = title,
             ProviderName = $"{Name}",
             Format = "xml",
-            Comment = $"来源：{scraper.Name}",
+            Comment = string.IsNullOrEmpty(searchInfo.Source) ? $"来源：{scraper.Name}" : $"来源：{scraper.Name}-{searchInfo.Source}",
         });
     }
 

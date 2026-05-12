@@ -56,6 +56,7 @@ public class DanmuApi : AbstractScraper
                 Category = anime.TypeDescription,
                 Year = anime.Year,
                 EpisodeSize = anime.EpisodeCount,
+                Source = anime.Source,
             });
         }
 
