@@ -142,7 +142,7 @@ public class DanmuSubtitleProvider : ISubtitleProvider
             {
                 var result = await scraper.Search(item);
                 var subtitles = new List<RemoteSubtitleInfo>();
-
+                
                 foreach (var searchInfo in result)
                 {
                     var title = searchInfo.Name;
@@ -150,7 +150,6 @@ public class DanmuSubtitleProvider : ISubtitleProvider
                     {
                         title = $"[{searchInfo.Category}] {searchInfo.Name}";
                     }
-
                     if (searchInfo.Year != null && searchInfo.Year > 0)
                     {
                         title += $" ({searchInfo.Year})";
@@ -159,20 +158,30 @@ public class DanmuSubtitleProvider : ISubtitleProvider
                     // 剧集支持更多规则
                     if (item is Episode)
                     {
-                        EpisodeAddMultiple(title, item, searchInfo, scraper, list);
+                        EpisodeAddMultiple(title, item, searchInfo, scraper, subtitles);
                     }
                     else
                     {
-                        AddRemoteSubtitleInfo(title, item, searchInfo, scraper, list, true, false);
+                        AddRemoteSubtitleInfo(title, item, searchInfo, scraper, subtitles, true, false);
                     }
                 }
+                
+                return subtitles;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[{0}]Exception handled processing queued movie events", scraper.Name);
+                return new List<RemoteSubtitleInfo>();
             }
         });
 
+        var results = await Task.WhenAll(searchTasks);
+        
+        // 合并所有结果
+        foreach (var subtitles in results)
+        {
+            list.AddRange(subtitles);
+        }
 
         return list;
     }
