@@ -1,17 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using ComposableAsync;
 using Jellyfin.Plugin.Danmu.Core.Extensions;
-using Jellyfin.Plugin.Danmu.Scrapers.Entity;
 using Jellyfin.Plugin.Danmu.Scrapers.Tencent.Entity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -62,7 +56,7 @@ public class TencentApi : AbstractApi
 
         await this.LimitRequestFrequently();
 
-        var postData = new TencentSearchRequest() { Query = keyword };
+        var postData = new TencentSearchRequest() { Query = keyword, Version = "25071701" };
         var url = $"https://pbaccess.video.qq.com/trpc.videosearch.mobile_search.HttpMobileRecall/MbSearchHttp";
         using var response = await httpClient.PostAsJsonAsync<TencentSearchRequest>(url, postData, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
